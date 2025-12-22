@@ -1,0 +1,18 @@
+appId: com.example.electronreacttodo
+productName: ElectronReactTodo
+directories:
+  output: dist
+files:
+  - "electron/**"
+  - "renderer/dist/**"
+extraMetadata:
+  main: "electron/main.js"
+asar: true
+
+mac:
+  target: dmg
+win:
+  target:
+    - dir
+linux:
+  target: AppImage

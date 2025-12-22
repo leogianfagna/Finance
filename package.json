@@ -1,0 +1,22 @@
+{
+  "name": "electron-react-todo",
+  "version": "1.0.0",
+  "description": "Electron + React + SQLite todo app example",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "dev:renderer": "cd renderer && npm run dev",
+    "dev:electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "build:renderer": "cd renderer && npm run build",
+    "build": "npm run build:renderer && electron-builder -c electron/electron-builder.yml"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  }
+}
