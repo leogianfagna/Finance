@@ -1,10 +1,11 @@
+// main.js
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
-const { getDb } = require("./db");
+const { getDb, monthKey, defaultMonthData } = require("./db");
 
 let mainWindow;
-
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+const USER_ID = 1; // single-user offline (pode evoluir depois)
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -30,6 +31,10 @@ function createWindow() {
   });
 }
 
+function nowISO() {
+  return new Date().toISOString();
+}
+
 app.whenReady().then(() => {
   createWindow();
 
@@ -39,29 +44,192 @@ app.whenReady().then(() => {
 
   const db = getDb();
 
-  // IPC handlers para todos
-  ipcMain.handle("todos:list", () => {
-    const rows = db.prepare("SELECT * FROM todos ORDER BY created_at DESC").all();
-    return rows;
+  /**
+   * MONTHS: listar meses do usuário
+   * Retorna: [{ id, year, month, updated_at, copied_from }]
+   */
+  ipcMain.handle("months:list", () => {
+    return db
+      .prepare(
+        `
+        SELECT id, year, month, updated_at, copied_from
+        FROM months
+        WHERE user_id = ?
+        ORDER BY year DESC, month DESC
+      `
+      )
+      .all(USER_ID);
   });
 
-  ipcMain.handle("todos:add", (_event, todo) => {
-    const stmt = db.prepare("INSERT INTO todos (text, done) VALUES (?, ?)");
-    const info = stmt.run(todo.text, 0);
-    return { id: info.lastInsertRowid };
+  /**
+   * MONTHS: buscar mês específico (year, month)
+   * Retorna: { id, year, month, data, updated_at, copied_from } ou null
+   */
+  ipcMain.handle("months:get", (_event, { year, month }) => {
+    const row = db
+      .prepare(
+        `
+        SELECT id, year, month, data_json, updated_at, copied_from
+        FROM months
+        WHERE user_id = ? AND year = ? AND month = ?
+      `
+      )
+      .get(USER_ID, year, month);
+
+    if (!row) return null;
+
+    let data = null;
+    try {
+      data = JSON.parse(row.data_json);
+    } catch {
+      // Se corromper, pelo menos não quebra o app inteiro
+      data = defaultMonthData({ year, month });
+    }
+
+    return {
+      id: row.id,
+      year: row.year,
+      month: row.month,
+      data,
+      updated_at: row.updated_at,
+      copied_from: row.copied_from
+    };
   });
 
-  ipcMain.handle("todos:toggle", (_event, id) => {
-    const row = db.prepare("SELECT done FROM todos WHERE id = ?").get(id);
-    if (!row) return { success: false };
-    const newDone = row.done ? 0 : 1;
-    db.prepare("UPDATE todos SET done = ? WHERE id = ?").run(newDone, id);
-    return { success: true };
+  /**
+   * MONTHS: criar ou atualizar mês (upsert)
+   * payload: { year, month, data }  (data é objeto JS)
+   * Retorna: { id, key }
+   */
+  ipcMain.handle("months:upsert", (_event, { year, month, data }) => {
+    const key = monthKey(year, month);
+
+    // Garantir formato mínimo
+    const safeData = data ?? defaultMonthData({ year, month });
+    if (!safeData.month) safeData.month = key;
+    if (!safeData.assets) safeData.assets = [];
+    if (!safeData.totals) safeData.totals = { netWorth: 0 };
+    if (!safeData.meta) safeData.meta = { copiedFrom: null, notes: "" };
+
+    const json = JSON.stringify(safeData);
+
+    // Tenta atualizar; se não existir, cria
+    const update = db
+      .prepare(
+        `
+        UPDATE months
+        SET data_json = ?, updated_at = ?
+        WHERE user_id = ? AND year = ? AND month = ?
+      `
+      )
+      .run(json, nowISO(), USER_ID, year, month);
+
+    if (update.changes > 0) {
+      const row = db
+        .prepare(
+          `SELECT id FROM months WHERE user_id = ? AND year = ? AND month = ?`
+        )
+        .get(USER_ID, year, month);
+
+      return { id: row.id, key };
+    }
+
+    const insert = db
+      .prepare(
+        `
+        INSERT INTO months (user_id, year, month, data_json, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `
+      )
+      .run(USER_ID, year, month, json, nowISO());
+
+    return { id: insert.lastInsertRowid, key };
   });
 
-  ipcMain.handle("todos:delete", (_event, id) => {
-    db.prepare("DELETE FROM todos WHERE id = ?").run(id);
-    return { success: true };
+  /**
+   * MONTHS: criar mês copiando do anterior
+   * payload: { year, month }  (mês alvo)
+   * Comportamento:
+   * - procura mês anterior existente
+   * - copia data_json
+   * - seta meta.copiedFrom e coluna copied_from
+   * Retorna: { id, key, copiedFrom } ou { id, key, copiedFrom: null } se criou vazio
+   */
+  ipcMain.handle("months:copyFromPrevious", (_event, { year, month }) => {
+    // Calcula mês anterior
+    let prevYear = year;
+    let prevMonth = month - 1;
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear -= 1;
+    }
+
+    const prevRow = db
+      .prepare(
+        `
+        SELECT data_json
+        FROM months
+        WHERE user_id = ? AND year = ? AND month = ?
+      `
+      )
+      .get(USER_ID, prevYear, prevMonth);
+
+    const targetKey = monthKey(year, month);
+    const prevKey = monthKey(prevYear, prevMonth);
+
+    let data = defaultMonthData({ year, month });
+    let copiedFrom = null;
+
+    if (prevRow) {
+      try {
+        data = JSON.parse(prevRow.data_json);
+      } catch {
+        data = defaultMonthData({ year, month });
+      }
+
+      // Ajusta o doc para o mês novo
+      data.month = targetKey;
+      data.meta = data.meta || {};
+      data.meta.copiedFrom = prevKey;
+      copiedFrom = prevKey;
+    }
+
+    const json = JSON.stringify(data);
+
+    // Cria (se já existir, não sobrescreve)
+    try {
+      const insert = db
+        .prepare(
+          `
+          INSERT INTO months (user_id, year, month, data_json, copied_from, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `
+        )
+        .run(USER_ID, year, month, json, copiedFrom, nowISO());
+
+      return { id: insert.lastInsertRowid, key: targetKey, copiedFrom };
+    } catch (e) {
+      // UNIQUE(user_id, year, month) pode estourar se já existir
+      const existing = db
+        .prepare(
+          `SELECT id FROM months WHERE user_id = ? AND year = ? AND month = ?`
+        )
+        .get(USER_ID, year, month);
+
+      return { id: existing.id, key: targetKey, copiedFrom: "already-exists" };
+    }
+  });
+
+  /**
+   * MONTHS: deletar um mês
+   * payload: { year, month }
+   */
+  ipcMain.handle("months:delete", (_event, { year, month }) => {
+    const info = db
+      .prepare(`DELETE FROM months WHERE user_id = ? AND year = ? AND month = ?`)
+      .run(USER_ID, year, month);
+
+    return { success: info.changes > 0 };
   });
 });
 

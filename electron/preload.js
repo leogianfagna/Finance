@@ -1,8 +1,9 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld("api", {
-  listTodos: () => ipcRenderer.invoke("todos:list"),
-  addTodo: (text) => ipcRenderer.invoke("todos:add", { text }),
-  toggleTodo: (id) => ipcRenderer.invoke("todos:toggle", id),
-  deleteTodo: (id) => ipcRenderer.invoke("todos:delete", id)
+contextBridge.exposeInMainWorld("finance", {
+  monthsList: () => ipcRenderer.invoke("months:list"),
+  monthsGet: (payload) => ipcRenderer.invoke("months:get", payload),
+  monthsUpsert: (payload) => ipcRenderer.invoke("months:upsert", payload),
+  monthsCopyFromPrevious: (payload) => ipcRenderer.invoke("months:copyFromPrevious", payload),
+  monthsDelete: (payload) => ipcRenderer.invoke("months:delete", payload),
 });
