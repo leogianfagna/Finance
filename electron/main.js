@@ -1,11 +1,10 @@
-// main.js
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const { getDb, monthKey, defaultMonthData } = require("./db");
 
 let mainWindow;
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
-const USER_ID = 1; // single-user offline (pode evoluir depois)
+const USER_ID = 1; // single-user offline
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -14,8 +13,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+    },
   });
 
   if (isDev) {
@@ -35,6 +34,11 @@ function nowISO() {
   return new Date().toISOString();
 }
 
+/**
+ * Declaração das funções da API para utilizar o banco de dados SQLite. Cada função de manipulação
+ * do DB é declarada dentro desse app com ipcMain e depois são invocadas no preload.js. Para ser
+ * usado na aplicação, chamar no financeApi.js as funções do preload.
+ */
 app.whenReady().then(() => {
   createWindow();
 
@@ -45,8 +49,8 @@ app.whenReady().then(() => {
   const db = getDb();
 
   /**
-   * MONTHS: listar meses do usuário
-   * Retorna: [{ id, year, month, updated_at, copied_from }]
+   * Listar todos os meses adicionado por um usuário.
+   * @returns {Object[]} Lista de meses com as propriedades do SELECT.
    */
   ipcMain.handle("months:list", () => {
     return db
@@ -92,7 +96,7 @@ app.whenReady().then(() => {
       month: row.month,
       data,
       updated_at: row.updated_at,
-      copied_from: row.copied_from
+      copied_from: row.copied_from,
     };
   });
 
@@ -226,7 +230,9 @@ app.whenReady().then(() => {
    */
   ipcMain.handle("months:delete", (_event, { year, month }) => {
     const info = db
-      .prepare(`DELETE FROM months WHERE user_id = ? AND year = ? AND month = ?`)
+      .prepare(
+        `DELETE FROM months WHERE user_id = ? AND year = ? AND month = ?`
+      )
       .run(USER_ID, year, month);
 
     return { success: info.changes > 0 };
