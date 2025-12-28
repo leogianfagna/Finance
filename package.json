@@ -1,5 +1,5 @@
 {
-  "name": "electron-react-todo",
+  "name": "electron-private-finance",
   "version": "1.0.0",
   "description": "Electron + React + SQLite todo app example",
   "main": "electron/main.js",
