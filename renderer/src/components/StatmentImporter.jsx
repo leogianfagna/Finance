@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
+import { numberToCurrencyBR } from "/src/utils/formater.js";
 
 /**
  * Espera CSV com colunas: Data, Valor, Identificador, Descrição
@@ -32,7 +33,7 @@ function normalizeHeader(h) {
 }
 
 function toNumberBR(value) {
-  console.log(value)
+  console.log(value);
   // aceita "1234.56" e também "1.234,56" e "-1.234,56"
   if (value == null) return NaN;
 
@@ -40,7 +41,7 @@ function toNumberBR(value) {
   if (!s) return NaN;
 
   const normalized = s.replace(/\./g, "").replace(",", ".");
-  console.log(normalized)
+  console.log(normalized);
   return Number(normalized);
 }
 
@@ -201,7 +202,7 @@ export default function StatementImporter() {
     if (fileExtenstionType === "csv") {
       const fileInText = await file.text();
       const parsed = parseCSV(fileInText);
-      console.log(parsed)
+      console.log(parsed);
       replace(parsed);
       return;
     }
@@ -439,8 +440,8 @@ export default function StatementImporter() {
             <button type="submit">Salvar</button>
 
             <div style={{ marginLeft: "auto", opacity: 0.85 }}>
-              Entradas: <b>{totals.entradas.toFixed(2)}</b> &nbsp;|&nbsp;
-              Saídas: <b>{totals.saidas.toFixed(2)}</b>
+              Entradas: <b>{numberToCurrencyBR(totals.entradas)}</b>{" "}
+              &nbsp;|&nbsp; Saídas: <b>{numberToCurrencyBR(totals.saidas)}</b>
             </div>
           </div>
         </form>
