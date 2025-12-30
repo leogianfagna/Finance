@@ -4,6 +4,7 @@ import MonthPicker from "../components/MonthPicker.jsx";
 import AssetEditor from "../components/AssetEditor.jsx";
 import AssetsTable from "../components/AssetsTable.jsx";
 import { computeTotals, defaultMonthData, getNowYearMonth, monthKey } from "../utils/month.js";
+import StatementImporter from "../components/StatmentImporter.jsx";
 
 export default function Dashboard() {
   const now = getNowYearMonth();
@@ -167,6 +168,8 @@ export default function Dashboard() {
           placeholder="Ex: mudanças na carteira, observações..."
         />
       </div>
+
+      <StatementImporter />
     </div>
   );
 }

@@ -11,7 +11,16 @@ import { useForm, useFieldArray } from "react-hook-form";
  * porque precisa de uma lib (ex: xlsx). Se quiser, eu já te devolvo a versão com xlsx também.
  */
 
-const CATEGORIES = ["", "Saúde", "Pagamentos", "Alimentação", "Transporte", "Educação", "Lazer", "Outros"];
+const CATEGORIES = [
+  "",
+  "Saúde",
+  "Pagamentos",
+  "Alimentação",
+  "Transporte",
+  "Educação",
+  "Lazer",
+  "Outros",
+];
 const TYPES = ["entrada", "saída"];
 
 function normalizeHeader(h) {
@@ -23,11 +32,15 @@ function normalizeHeader(h) {
 }
 
 function toNumberBR(value) {
+  console.log(value)
   // aceita "1234.56" e também "1.234,56" e "-1.234,56"
   if (value == null) return NaN;
+
   const s = String(value).trim();
   if (!s) return NaN;
+
   const normalized = s.replace(/\./g, "").replace(",", ".");
+  console.log(normalized)
   return Number(normalized);
 }
 
@@ -57,7 +70,9 @@ function inferTypeFromValue(n) {
 }
 
 function sanitizeDescription(s) {
-  return String(s ?? "").replace(/\s+/g, " ").trim();
+  return String(s ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function splitCSVLine(line) {
@@ -121,7 +136,7 @@ function parseCSV(text) {
     const descRaw = idxDesc >= 0 ? cols[idxDesc] : "";
 
     const isoDate = parseDateToISO(dataRaw);
-    const n = toNumberBR(valorRaw);
+    const n = parseFloat(valorRaw);
     const tipo = inferTypeFromValue(n);
 
     // valor na tabela fica como número (sempre positivo/negativo como veio)
@@ -165,6 +180,7 @@ export default function StatementImporter() {
   const totals = useMemo(() => {
     let entradas = 0;
     let saidas = 0;
+
     for (const r of fields) {
       const v = Number(r.valor);
       if (Number.isFinite(v)) {
@@ -172,6 +188,7 @@ export default function StatementImporter() {
         else saidas += v;
       }
     }
+
     return { entradas, saidas };
   }, [fields]);
 
@@ -179,19 +196,21 @@ export default function StatementImporter() {
     if (!file) return;
 
     setFileName(file.name);
+    const fileExtenstionType = file.name.toLowerCase().split(".").pop();
 
-    const ext = file.name.toLowerCase().split(".").pop();
-
-    if (ext === "csv") {
-      const text = await file.text();
-      const parsed = parseCSV(text);
+    if (fileExtenstionType === "csv") {
+      const fileInText = await file.text();
+      const parsed = parseCSV(fileInText);
+      console.log(parsed)
       replace(parsed);
       return;
     }
 
     // Excel (xlsx/xls) — placeholder (precisa lib xlsx)
-    if (ext === "xlsx" || ext === "xls") {
-      alert("Importação de Excel ainda não está habilitada. Use CSV por enquanto.");
+    if (fileExtenstionType === "xlsx" || fileExtenstionType === "xls") {
+      alert(
+        "Importação de Excel ainda não está habilitada. Use CSV por enquanto."
+      );
       return;
     }
 
@@ -212,7 +231,13 @@ export default function StatementImporter() {
   const onSave = (data) => {
     // validações extras (além do RHF)
     // aqui basta garantir que todas as categorias foram preenchidas e data válida
-    const invalid = data.rows.some((r) => !r.data || !r.descricao?.trim() || !r.categoria || !TYPES.includes(r.tipo));
+    const invalid = data.rows.some(
+      (r) =>
+        !r.data ||
+        !r.descricao?.trim() ||
+        !r.categoria ||
+        !TYPES.includes(r.tipo)
+    );
     if (invalid) return;
 
     console.log("Salvo!");
@@ -220,36 +245,74 @@ export default function StatementImporter() {
   };
 
   return (
-    <div style={{ border: "1px solid #3333", padding: 12, borderRadius: 8, marginTop: 12 }}>
+    <div
+      style={{
+        border: "1px solid #3333",
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 12,
+      }}
+    >
       <h3 style={{ margin: "0 0 10px" }}>Importar extrato do mês</h3>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
         <input
           type="file"
           accept=".csv,.xlsx,.xls"
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
-        {fileName && <span style={{ opacity: 0.85 }}>Arquivo: <b>{fileName}</b></span>}
+        {fileName && (
+          <span style={{ opacity: 0.85 }}>
+            Arquivo: <b>{fileName}</b>
+          </span>
+        )}
 
-        <button type="button" onClick={() => { replace([]); setFileName(""); }}>
+        <button
+          type="button"
+          onClick={() => {
+            replace([]);
+            setFileName("");
+          }}
+        >
           Limpar
         </button>
       </div>
 
       {!fields.length ? (
-        <p style={{ opacity: 0.8, marginTop: 12 }}>Nenhuma linha importada ainda.</p>
+        <p style={{ opacity: 0.8, marginTop: 12 }}>
+          Nenhuma linha importada ainda.
+        </p>
       ) : (
         <form onSubmit={handleSubmit(onSave)}>
           <div style={{ marginTop: 12, overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ textAlign: "left" }}>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Data</th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Descrição</th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Categoria</th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Valor</th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Tipo</th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Ações</th>
+                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                    Data
+                  </th>
+                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                    Descrição
+                  </th>
+                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                    Categoria
+                  </th>
+                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                    Valor
+                  </th>
+                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                    Tipo
+                  </th>
+                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                    Ações
+                  </th>
                 </tr>
               </thead>
 
@@ -311,12 +374,17 @@ export default function StatementImporter() {
                         {...register(`rows.${index}.valor`, {
                           required: "Obrigatório",
                           valueAsNumber: true,
-                          validate: (v) => Number.isFinite(v) || "Número inválido",
+                          validate: (v) =>
+                            Number.isFinite(v) || "Número inválido",
                         })}
                         onChange={(e) => {
                           // permite digitar em pt-BR sem quebrar, e ainda manter número no estado
                           const n = toNumberBR(e.target.value);
-                          setValue(`rows.${index}.valor`, Number.isFinite(n) ? n : 0, { shouldValidate: true });
+                          setValue(
+                            `rows.${index}.valor`,
+                            Number.isFinite(n) ? n : 0,
+                            { shouldValidate: true }
+                          );
                         }}
                       />
                       {errors?.rows?.[index]?.valor && (
@@ -327,7 +395,11 @@ export default function StatementImporter() {
                     </td>
 
                     <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      <select {...register(`rows.${index}.tipo`, { required: "Obrigatório" })}>
+                      <select
+                        {...register(`rows.${index}.tipo`, {
+                          required: "Obrigatório",
+                        })}
+                      >
                         {TYPES.map((t) => (
                           <option key={t} value={t}>
                             {t}
@@ -352,7 +424,14 @@ export default function StatementImporter() {
             </table>
           </div>
 
-          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              marginTop: 12,
+              flexWrap: "wrap",
+            }}
+          >
             <button type="button" onClick={addRow}>
               Adicionar linha
             </button>
@@ -360,8 +439,8 @@ export default function StatementImporter() {
             <button type="submit">Salvar</button>
 
             <div style={{ marginLeft: "auto", opacity: 0.85 }}>
-              Entradas: <b>{totals.entradas.toFixed(2)}</b> &nbsp;|&nbsp; Saídas:{" "}
-              <b>{totals.saidas.toFixed(2)}</b>
+              Entradas: <b>{totals.entradas.toFixed(2)}</b> &nbsp;|&nbsp;
+              Saídas: <b>{totals.saidas.toFixed(2)}</b>
             </div>
           </div>
         </form>
