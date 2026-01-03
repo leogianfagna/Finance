@@ -206,13 +206,7 @@ export default function StatementImporter() {
   }
 
   const onSave = (data) => {
-    // validações extras (além do RHF)
-    // aqui basta garantir que todas as categorias foram preenchidas e data válida
-    const invalid = data.rows.some(
-      (r) => !r.data || !r.descricao?.trim() || !r.categoria
-    );
-    if (invalid) return;
-
+    console.log(data);
     console.log("Salvo!");
     // futuramente: enviar pro backend / estado global etc
   };
@@ -220,15 +214,13 @@ export default function StatementImporter() {
   return (
     <div
       style={{
-        border: "1px solid #3333",
-        padding: 12,
         borderRadius: 8,
         marginTop: 12,
       }}
     >
-      <h3 style={{ margin: "0 0 10px" }}>Histórico do extrato mensal</h3>
-
-      <div style={{border: "1px solid #3333", borderRadius: "6px", padding: 12}}>
+      <div
+        style={{ border: "1px solid #3333", borderRadius: "6px", padding: 12 }}
+      >
         <span style={{ fontSize: "1.1rem" }}>Importar histórico</span>
         <div
           style={{
@@ -236,7 +228,7 @@ export default function StatementImporter() {
             gap: 10,
             alignItems: "center",
             flexWrap: "wrap",
-            marginTop: "0.5rem"
+            marginTop: "0.5rem",
           }}
         >
           <input

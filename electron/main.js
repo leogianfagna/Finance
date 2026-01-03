@@ -112,6 +112,7 @@ app.whenReady().then(() => {
     const safeData = data ?? defaultMonthData({ year, month });
     if (!safeData.month) safeData.month = key;
     if (!safeData.assets) safeData.assets = [];
+    if (!safeData.extract) safeData.extract = [];
     if (!safeData.totals) safeData.totals = { netWorth: 0 };
     if (!safeData.meta) safeData.meta = { copiedFrom: null, notes: "" };
 

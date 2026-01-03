@@ -1,4 +1,3 @@
-import React from "react";
 import { useForm } from "react-hook-form";
 
 import { TYPES, INSTITUTIONS } from "/src/constants/constants"; 
@@ -45,7 +44,7 @@ export default function AssetEditor({ onAdd }) {
 
   return (
     <div style={{ border: "1px solid #3333", padding: 12, borderRadius: 8, marginTop: 12 }}>
-      <h3 style={{ margin: "0 0 10px" }}>Adicionar ativo</h3>
+      <span style={{ margin: "0 0 10px", color: "gray", "fontSize": "0.8rem" }}>Adicionar ativo</span>
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

@@ -3,7 +3,12 @@ import { financeApi } from "../api/financeApi.js";
 import MonthPicker from "../components/MonthPicker.jsx";
 import AssetEditor from "../components/AssetEditor.jsx";
 import AssetsTable from "../components/AssetsTable.jsx";
-import { computeTotals, defaultMonthData, getNowYearMonth, monthKey } from "../utils/month.js";
+import {
+  computeTotals,
+  defaultMonthData,
+  getNowYearMonth,
+  monthKey,
+} from "../utils/month.js";
 import StatementImporter from "../components/StatmentImporter.jsx";
 
 export default function Dashboard() {
@@ -93,7 +98,9 @@ export default function Dashboard() {
   function handleUpdateAsset(assetId, patch) {
     const base = data ?? defaultMonthData(year, month);
     const nextAssets = (base.assets || []).map((a) =>
-      a.id === assetId ? { ...a, ...patch, lastUpdate: new Date().toISOString().slice(0, 10) } : a
+      a.id === assetId
+        ? { ...a, ...patch, lastUpdate: new Date().toISOString().slice(0, 10) }
+        : a
     );
     saveData({ ...base, assets: nextAssets });
   }
@@ -120,38 +127,73 @@ export default function Dashboard() {
         onDelete={handleDelete}
       />
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ padding: 12, border: "1px solid #3333", borderRadius: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{ padding: 12, border: "1px solid #3333", borderRadius: 8 }}
+        >
           <div style={{ opacity: 0.8, fontSize: 12 }}>Mês</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{key}</div>
         </div>
 
-        <div style={{ padding: 12, border: "1px solid #3333", borderRadius: 8 }}>
+        <div
+          style={{ padding: 12, border: "1px solid #3333", borderRadius: 8 }}
+        >
           <div style={{ opacity: 0.8, fontSize: 12 }}>Patrimônio total</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>
-            {netWorth.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            {netWorth.toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })}
           </div>
         </div>
 
         <div style={{ opacity: 0.85 }}>
-          {loading ? "Carregando..." : monthRow ? `Atualizado em: ${monthRow.updated_at}` : "Mês não existe ainda."}
+          {loading
+            ? "Carregando..."
+            : monthRow
+            ? `Atualizado em: ${monthRow.updated_at}`
+            : "Mês não existe ainda."}
           {saving ? " (salvando...)" : ""}
         </div>
       </div>
 
       {!monthRow && (
-        <div style={{ padding: 12, border: "1px dashed #3336", borderRadius: 8 }}>
+        <div
+          style={{ padding: 12, border: "1px dashed #3336", borderRadius: 8 }}
+        >
           <p style={{ margin: 0 }}>
-            Esse mês ainda não foi criado. Você pode <b>criar vazio</b> ou <b>copiar do mês anterior</b>.
+            Esse mês ainda não foi criado. Você pode <b>criar vazio</b> ou{" "}
+            <b>copiar do mês anterior</b>.
           </p>
         </div>
       )}
 
-      <AssetEditor onAdd={handleAddAsset} />
-
       <div style={{ marginTop: 6 }}>
         <h3 style={{ margin: "10px 0" }}>Ativos do mês</h3>
-        <AssetsTable assets={assets} onUpdateAsset={handleUpdateAsset} onRemoveAsset={handleRemoveAsset} />
+        <AssetEditor onAdd={handleAddAsset} />
+        <AssetsTable
+          assets={assets}
+          onUpdateAsset={handleUpdateAsset}
+          onRemoveAsset={handleRemoveAsset}
+        />
+      </div>
+
+      <div style={{ marginTop: 6 }}>
+        <h3 style={{ margin: "10px 0" }}>Histórico do extrato mensal</h3>
+        {/* <AssetEditor onAdd={handleAddAsset} />
+        <AssetsTable
+          assets={assets}
+          onUpdateAsset={handleUpdateAsset}
+          onRemoveAsset={handleRemoveAsset}
+        /> */}
+        <StatementImporter />
       </div>
 
       <div style={{ marginTop: 10 }}>
@@ -162,14 +204,15 @@ export default function Dashboard() {
           value={data?.meta?.notes || ""}
           onChange={(e) => {
             const base = data ?? defaultMonthData(year, month);
-            const next = { ...base, meta: { ...(base.meta || {}), notes: e.target.value } };
+            const next = {
+              ...base,
+              meta: { ...(base.meta || {}), notes: e.target.value },
+            };
             saveData(next);
           }}
           placeholder="Ex: mudanças na carteira, observações..."
         />
       </div>
-
-      <StatementImporter />
     </div>
   );
 }
