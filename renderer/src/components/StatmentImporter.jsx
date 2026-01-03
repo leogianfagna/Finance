@@ -6,7 +6,6 @@ import { numberToCurrencyBR } from "/src/utils/formater.js";
  * Espera CSV com colunas: Data, Valor, Identificador, Descrição
  * - "Identificador" é descartado
  * - "categoria" começa vazia
- * - "tipo" é "entrada" se valor > 0, senão "saída"
  *
  * Observação: Excel (.xlsx/.xls) aqui fica implementado como "placeholder" (mensagem),
  * porque precisa de uma lib (ex: xlsx). Se quiser, eu já te devolvo a versão com xlsx também.
@@ -63,11 +62,6 @@ function parseDateToISO(d) {
     return `${yyyy}-${mm}-${dd}`;
   }
   return "";
-}
-
-function inferTypeFromValue(n) {
-  if (!Number.isFinite(n)) return "saída";
-  return n >= 0 ? "entrada" : "saída";
 }
 
 function sanitizeDescription(s) {
@@ -138,7 +132,6 @@ function parseCSV(text) {
 
     const isoDate = parseDateToISO(dataRaw);
     const n = parseFloat(valorRaw);
-    const tipo = inferTypeFromValue(n);
 
     // valor na tabela fica como número (sempre positivo/negativo como veio)
     // usuário pode editar depois
@@ -148,7 +141,6 @@ function parseCSV(text) {
       descricao: sanitizeDescription(descRaw),
       categoria: "",
       valor: Number.isFinite(n) ? n : 0,
-      tipo,
     });
   }
 
@@ -185,8 +177,8 @@ export default function StatementImporter() {
     for (const r of fields) {
       const v = Number(r.valor);
       if (Number.isFinite(v)) {
-        if ((r.tipo || "saída") === "entrada") entradas += v;
-        else saidas += v;
+        if (v < 0) saidas += v;
+        else entradas += v;
       }
     }
 
@@ -225,7 +217,6 @@ export default function StatementImporter() {
       descricao: "",
       categoria: "",
       valor: 0,
-      tipo: "saída",
     });
   }
 
@@ -233,11 +224,7 @@ export default function StatementImporter() {
     // validações extras (além do RHF)
     // aqui basta garantir que todas as categorias foram preenchidas e data válida
     const invalid = data.rows.some(
-      (r) =>
-        !r.data ||
-        !r.descricao?.trim() ||
-        !r.categoria ||
-        !TYPES.includes(r.tipo)
+      (r) => !r.data || !r.descricao?.trim() || !r.categoria
     );
     if (invalid) return;
 
@@ -307,9 +294,6 @@ export default function StatementImporter() {
                   </th>
                   <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
                     Valor
-                  </th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                    Tipo
                   </th>
                   <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
                     Ações
@@ -391,25 +375,6 @@ export default function StatementImporter() {
                       {errors?.rows?.[index]?.valor && (
                         <div style={{ fontSize: 12, color: "crimson" }}>
                           {errors.rows[index].valor.message}
-                        </div>
-                      )}
-                    </td>
-
-                    <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      <select
-                        {...register(`rows.${index}.tipo`, {
-                          required: "Obrigatório",
-                        })}
-                      >
-                        {TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                      {errors?.rows?.[index]?.tipo && (
-                        <div style={{ fontSize: 12, color: "crimson" }}>
-                          {errors.rows[index].tipo.message}
                         </div>
                       )}
                     </td>
