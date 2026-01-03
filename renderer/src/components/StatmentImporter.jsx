@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { numberToCurrencyBR } from "/src/utils/formater.js";
+import { PAYMENT_CATEGORIES } from "/src/constants/constants";
 
 /**
  * Espera CSV com colunas: Data, Valor, Identificador, Descrição
@@ -11,18 +12,6 @@ import { numberToCurrencyBR } from "/src/utils/formater.js";
  * porque precisa de uma lib (ex: xlsx). Se quiser, eu já te devolvo a versão com xlsx também.
  */
 
-const CATEGORIES = [
-  "",
-  "Saúde",
-  "Pagamentos",
-  "Alimentação",
-  "Transporte",
-  "Educação",
-  "Lazer",
-  "Outros",
-];
-const TYPES = ["entrada", "saída"];
-
 function normalizeHeader(h) {
   return String(h || "")
     .trim()
@@ -32,15 +21,12 @@ function normalizeHeader(h) {
 }
 
 function toNumberBR(value) {
-  console.log(value);
-  // aceita "1234.56" e também "1.234,56" e "-1.234,56"
   if (value == null) return NaN;
 
   const s = String(value).trim();
   if (!s) return NaN;
 
   const normalized = s.replace(/\./g, "").replace(",", ".");
-  console.log(normalized);
   return Number(normalized);
 }
 
@@ -154,7 +140,6 @@ export default function StatementImporter() {
     control,
     register,
     handleSubmit,
-    reset,
     setValue,
     formState: { errors },
   } = useForm({
@@ -167,7 +152,7 @@ export default function StatementImporter() {
   const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "rows",
-    keyName: "keyId", // evita conflito com nosso "id"
+    keyName: "keyId",
   });
 
   const totals = useMemo(() => {
@@ -241,36 +226,40 @@ export default function StatementImporter() {
         marginTop: 12,
       }}
     >
-      <h3 style={{ margin: "0 0 10px" }}>Importar extrato do mês</h3>
+      <h3 style={{ margin: "0 0 10px" }}>Histórico do extrato mensal</h3>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <input
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={(e) => handleFile(e.target.files?.[0])}
-        />
-        {fileName && (
-          <span style={{ opacity: 0.85 }}>
-            Arquivo: <b>{fileName}</b>
-          </span>
-        )}
-
-        <button
-          type="button"
-          onClick={() => {
-            replace([]);
-            setFileName("");
+      <div style={{border: "1px solid #3333", borderRadius: "6px", padding: 12}}>
+        <span style={{ fontSize: "1.1rem" }}>Importar histórico</span>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginTop: "0.5rem"
           }}
         >
-          Limpar
-        </button>
+          <input
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={(e) => handleFile(e.target.files?.[0])}
+          />
+          {fileName && (
+            <span style={{ opacity: 0.85 }}>
+              Arquivo: <b>{fileName}</b>
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              replace([]);
+              setFileName("");
+            }}
+          >
+            Limpar
+          </button>
+        </div>
       </div>
 
       {!fields.length ? (
@@ -340,7 +329,7 @@ export default function StatementImporter() {
                           required: "Selecione uma categoria",
                         })}
                       >
-                        {CATEGORIES.map((c) => (
+                        {PAYMENT_CATEGORIES.map((c) => (
                           <option key={c || "empty"} value={c}>
                             {c ? c : "Selecione..."}
                           </option>
