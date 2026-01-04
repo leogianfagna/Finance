@@ -6,6 +6,7 @@ import AssetEditor from "../components/AssetEditor.jsx";
 import AssetsTable from "../components/AssetsTable.jsx";
 import StatementImporter from "../components/StatmentImporter.jsx";
 import StatementTable from "../components/StatementTable.jsx";
+import { Page } from "../components/Page.jsx";
 
 import {
   computeTotals,
@@ -13,7 +14,7 @@ import {
   getNowYearMonth,
   monthKey,
 } from "../utils/month.js";
-import { Page } from "../components/Page.jsx";
+import { generateMonthSummary } from "../utils/data.js";
 
 /**
  * Ponto inicial da aplicação.
@@ -30,7 +31,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState("user-amount");
 
   /**
-   * Baseado no ano, resgata os dados do banco de dados e atribui à estados.
+   * Baseado no ano, resgata os dados do banco de dados e atribui ao estado MonthData.
    */
   async function loadCurrentMonthData() {
     setLoading(true);
@@ -61,6 +62,8 @@ export default function Dashboard() {
     const total = assets.reduce((sum, a) => sum + (Number(a.total) || 0), 0);
     return total;
   }, [assets]);
+
+  const summaryData = useMemo(() => generateMonthSummary(monthData), [monthData]);
 
   /**
    * Salva todos os dados do mês que está sendo editado. Edita o valor total
@@ -277,10 +280,18 @@ export default function Dashboard() {
       )}
 
       <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={() => setTab("summary")}>Resumo mensal</button>
         <button onClick={() => setTab("user-amount")}>Saldo patrimonial</button>
         <button onClick={() => setTab("statement")}>Extrato</button>
         <button onClick={() => setTab("notes")}>Notas</button>
       </div>
+
+      <Page id="summary" active={tab} title="Resumo do mês">
+        <span>todo</span>
+        <pre style={{ background: "#f6f6f6", padding: 12, borderRadius: 8 }}>
+          {JSON.stringify(summaryData, null, 2)}
+        </pre>
+      </Page>
 
       <Page id="user-amount" active={tab} title="Ativos do mês">
         <AssetEditor onAdd={handleAddAsset} />
