@@ -13,6 +13,7 @@ import {
   getNowYearMonth,
   monthKey,
 } from "../utils/month.js";
+import { Page } from "../components/Page.jsx";
 
 /**
  * Ponto inicial da aplicação.
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [monthData, setMonthData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savingLoading, setSavingLoading] = useState(false);
+  const [tab, setTab] = useState("user-amount");
 
   /**
    * Baseado no ano, resgata os dados do banco de dados e atribui à estados.
@@ -70,7 +72,7 @@ export default function Dashboard() {
     setSavingLoading(true);
     try {
       const fixedWithTotalBalance = computeTotals(nextData);
-      console.warn(fixedWithTotalBalance)
+      console.warn(fixedWithTotalBalance);
       await financeApi.monthsUpsert({ year, month, data: fixedWithTotalBalance });
       await loadCurrentMonthData();
     } finally {
@@ -211,13 +213,13 @@ export default function Dashboard() {
    * Salva todas as linhas importadas para o extrato de um arquivo no banco de dados
    * com os demais extratos já inseridos. Função chamada no onSubmit do RHF apenas
    * quando todas as linhas estão validadas.
-   * 
+   *
    * @param {Object[]} fixedImportedStatement Linhas de extrato importadas e validadas.
    */
   function handleSaveStatementRows(fixedImportedStatement) {
     const base = data ?? defaultMonthData(year, month);
     const current = base.statement || [];
-    const nextData = current.concat(fixedImportedStatement)
+    const nextData = current.concat(fixedImportedStatement);
     saveData({ ...base, statement: nextData });
   }
 
@@ -263,15 +265,6 @@ export default function Dashboard() {
             })}
           </div>
         </div>
-
-        <div style={{ opacity: 0.85 }}>
-          {loading
-            ? "Carregando..."
-            : setMonthData
-            ? `Atualizado em: ${setMonthData.updated_at}`
-            : "Mês não existe ainda."}
-          {savingLoading ? " (salvando...)" : ""}
-        </div>
       </div>
 
       {!setMonthData && (
@@ -283,30 +276,32 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div style={{ marginTop: 6 }}>
-        <h3 style={{ margin: "10px 0" }}>Ativos do mês</h3>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={() => setTab("user-amount")}>Saldo patrimonial</button>
+        <button onClick={() => setTab("statement")}>Extrato</button>
+        <button onClick={() => setTab("notes")}>Notas</button>
+      </div>
+
+      <Page id="user-amount" active={tab} title="Ativos do mês">
         <AssetEditor onAdd={handleAddAsset} />
         <AssetsTable
           assets={assets}
           onUpdateAsset={handleUpdateAsset}
           onRemoveAsset={handleRemoveAsset}
         />
-      </div>
+      </Page>
 
-      <div style={{ marginTop: 6 }}>
-        <h3 style={{ margin: "10px 0" }}>Histórico do extrato mensal</h3>
+      <Page id="statement" active={tab} title="Histórico do extrato mensal">
         <StatementImporter onImport={handleSaveStatementRows} />
-
         <StatementTable
           rows={statement}
           onAddRow={handleAddStatementRow}
           onUpdateRow={handleUpdateStatementRow}
           onRemoveRow={handleRemoveStatementRow}
         />
-      </div>
+      </Page>
 
-      <div style={{ marginTop: 10 }}>
-        <h3 style={{ margin: "10px 0" }}>Notas do mês</h3>
+      <Page id="notes" active={tab} title="Notas do mês">
         <textarea
           rows={4}
           style={{ width: "100%", padding: 10 }}
@@ -321,7 +316,7 @@ export default function Dashboard() {
           }}
           placeholder="Ex: mudanças na carteira, observações..."
         />
-      </div>
+      </Page>
     </div>
   );
 }
