@@ -70,6 +70,7 @@ export default function Dashboard() {
     setSavingLoading(true);
     try {
       const fixedWithTotalBalance = computeTotals(nextData);
+      console.warn(fixedWithTotalBalance)
       await financeApi.monthsUpsert({ year, month, data: fixedWithTotalBalance });
       await loadCurrentMonthData();
     } finally {
@@ -211,15 +212,13 @@ export default function Dashboard() {
    * com os demais extratos já inseridos. Função chamada no onSubmit do RHF apenas
    * quando todas as linhas estão validadas.
    * 
-   * TO-DO: Com problema, não está salvando corretamente, fica tudo vazio
-   *
    * @param {Object[]} fixedImportedStatement Linhas de extrato importadas e validadas.
    */
-  function handleImportStatementRows(fixedImportedStatement) {
-    console.log(fixedImportedStatement)
+  function handleSaveStatementRows(fixedImportedStatement) {
     const base = data ?? defaultMonthData(year, month);
     const current = base.statement || [];
-    saveData({ ...base, statement: [...current, fixedImportedStatement] });
+    const nextData = current.concat(fixedImportedStatement)
+    saveData({ ...base, statement: nextData });
   }
 
   /**
@@ -296,7 +295,7 @@ export default function Dashboard() {
 
       <div style={{ marginTop: 6 }}>
         <h3 style={{ margin: "10px 0" }}>Histórico do extrato mensal</h3>
-        <StatementImporter onImport={handleImportStatementRows} />
+        <StatementImporter onImport={handleSaveStatementRows} />
 
         <StatementTable
           rows={statement}

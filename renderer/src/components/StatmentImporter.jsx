@@ -209,7 +209,6 @@ export default function StatementImporter({onImport}) {
   }
 
   const onSave = (data) => {
-    console.log(data);
     console.log("Salvo!");
     // futuramente: enviar pro backend / estado global etc
     onImport(data.rows)
