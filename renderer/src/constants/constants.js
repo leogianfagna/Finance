@@ -18,5 +18,6 @@ export const PAYMENT_CATEGORIES = [
   "Transporte",
   "Educação",
   "Lazer",
+  "Presentes",
   "Outros",
 ];

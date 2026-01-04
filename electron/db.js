@@ -67,6 +67,7 @@ function defaultMonthData({ year, month }) {
   return {
     month: monthKey(year, month),
     assets: [],
+    statement: [],
     totals: { netWorth: 0 },
     meta: {
       copiedFrom: null,

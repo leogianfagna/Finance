@@ -123,17 +123,19 @@ function parseCSV(text) {
     // usuário pode editar depois
     rows.push({
       id: crypto.randomUUID?.() || String(Date.now() + i),
-      data: isoDate,
-      descricao: sanitizeDescription(descRaw),
-      categoria: "",
-      valor: Number.isFinite(n) ? n : 0,
+      date: isoDate,
+      description: sanitizeDescription(descRaw),
+      category: "",
+      amount: Number.isFinite(n) ? n : 0,
+      account: "to-do",
+      type: "to-do",
     });
   }
 
   return rows;
 }
 
-export default function StatementImporter() {
+export default function StatementImporter({onImport}) {
   const [fileName, setFileName] = useState("");
 
   const {
@@ -186,22 +188,23 @@ export default function StatementImporter() {
 
     // Excel (xlsx/xls) — placeholder (precisa lib xlsx)
     if (fileExtenstionType === "xlsx" || fileExtenstionType === "xls") {
-      alert(
-        "Importação de Excel ainda não está habilitada. Use CSV por enquanto."
-      );
+      alert("Importação de Excel ainda não está habilitada. Use CSV por enquanto.");
       return;
     }
 
     alert("Formato não suportado. Envie um CSV ou Excel.");
   }
 
+  // to-do: alinhar com StatementTable que essa mesma formação é repetida diversas vezes
   function addRow() {
     append({
       id: crypto.randomUUID?.() || String(Date.now()),
-      data: "",
-      descricao: "",
-      categoria: "",
-      valor: 0,
+      date: "",
+      description: "",
+      category: "",
+      account: "to-do",
+      type: "to-do",
+      amount: 0,
     });
   }
 
@@ -209,6 +212,7 @@ export default function StatementImporter() {
     console.log(data);
     console.log("Salvo!");
     // futuramente: enviar pro backend / estado global etc
+    onImport(data.rows)
   };
 
   return (
@@ -218,9 +222,7 @@ export default function StatementImporter() {
         marginTop: 12,
       }}
     >
-      <div
-        style={{ border: "1px solid #3333", borderRadius: "6px", padding: 12 }}
-      >
+      <div style={{ border: "1px solid #3333", borderRadius: "6px", padding: 12 }}>
         <span style={{ fontSize: "1.1rem" }}>Importar histórico</span>
         <div
           style={{
@@ -252,146 +254,145 @@ export default function StatementImporter() {
             Limpar
           </button>
         </div>
-      </div>
 
-      {!fields.length ? (
-        <p style={{ opacity: 0.8, marginTop: 12 }}>
-          Nenhuma linha importada ainda.
-        </p>
-      ) : (
-        <form onSubmit={handleSubmit(onSave)}>
-          <div style={{ marginTop: 12, overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ textAlign: "left" }}>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                    Data
-                  </th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                    Descrição
-                  </th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                    Categoria
-                  </th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                    Valor
-                  </th>
-                  <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {fields.map((row, index) => (
-                  <tr key={row.keyId}>
-                    <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      <input
-                        type="date"
-                        {...register(`rows.${index}.data`, {
-                          required: "Obrigatório",
-                        })}
-                      />
-                      {errors?.rows?.[index]?.data && (
-                        <div style={{ fontSize: 12, color: "crimson" }}>
-                          {errors.rows[index].data.message}
-                        </div>
-                      )}
-                    </td>
-
-                    <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      <input
-                        style={{ width: 280 }}
-                        placeholder="Descrição"
-                        {...register(`rows.${index}.descricao`, {
-                          required: "Obrigatório",
-                          validate: (v) => v.trim().length > 0 || "Obrigatório",
-                        })}
-                      />
-                      {errors?.rows?.[index]?.descricao && (
-                        <div style={{ fontSize: 12, color: "crimson" }}>
-                          {errors.rows[index].descricao.message}
-                        </div>
-                      )}
-                    </td>
-
-                    <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      <select
-                        {...register(`rows.${index}.categoria`, {
-                          required: "Selecione uma categoria",
-                        })}
-                      >
-                        {PAYMENT_CATEGORIES.map((c) => (
-                          <option key={c || "empty"} value={c}>
-                            {c ? c : "Selecione..."}
-                          </option>
-                        ))}
-                      </select>
-                      {errors?.rows?.[index]?.categoria && (
-                        <div style={{ fontSize: 12, color: "crimson" }}>
-                          {errors.rows[index].categoria.message}
-                        </div>
-                      )}
-                    </td>
-
-                    <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      <input
-                        inputMode="decimal"
-                        {...register(`rows.${index}.valor`, {
-                          required: "Obrigatório",
-                          valueAsNumber: true,
-                          validate: (v) =>
-                            Number.isFinite(v) || "Número inválido",
-                        })}
-                        onChange={(e) => {
-                          // permite digitar em pt-BR sem quebrar, e ainda manter número no estado
-                          const n = toNumberBR(e.target.value);
-                          setValue(
-                            `rows.${index}.valor`,
-                            Number.isFinite(n) ? n : 0,
-                            { shouldValidate: true }
-                          );
-                        }}
-                      />
-                      {errors?.rows?.[index]?.valor && (
-                        <div style={{ fontSize: 12, color: "crimson" }}>
-                          {errors.rows[index].valor.message}
-                        </div>
-                      )}
-                    </td>
-
-                    <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      <button type="button" onClick={() => remove(index)}>
-                        Apagar
-                      </button>
-                    </td>
+        {!fields.length ? (
+          <p style={{ opacity: 0.8, marginTop: 12 }}>
+            Nenhuma linha importada ainda.
+          </p>
+        ) : (
+          <form onSubmit={handleSubmit(onSave)}>
+            <div style={{ marginTop: 12, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left" }}>
+                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                      Data
+                    </th>
+                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                      Descrição
+                    </th>
+                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                      Categoria
+                    </th>
+                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                      Valor
+                    </th>
+                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                      Ações
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              marginTop: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <button type="button" onClick={addRow}>
-              Adicionar linha
-            </button>
+                <tbody>
+                  {fields.map((row, index) => (
+                    <tr key={row.keyId}>
+                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                        <input
+                          type="date"
+                          {...register(`rows.${index}.date`, {
+                            required: "Obrigatório",
+                          })}
+                        />
+                        {errors?.rows?.[index]?.date && (
+                          <div style={{ fontSize: 12, color: "crimson" }}>
+                            {errors.rows[index].date.message}
+                          </div>
+                        )}
+                      </td>
 
-            <button type="submit">Salvar</button>
+                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                        <input
+                          style={{ width: 280 }}
+                          placeholder="Descrição"
+                          {...register(`rows.${index}.description`, {
+                            required: "Obrigatório",
+                            validate: (v) => v.trim().length > 0 || "Obrigatório",
+                          })}
+                        />
+                        {errors?.rows?.[index]?.description && (
+                          <div style={{ fontSize: 12, color: "crimson" }}>
+                            {errors.rows[index].description.message}
+                          </div>
+                        )}
+                      </td>
 
-            <div style={{ marginLeft: "auto", opacity: 0.85 }}>
-              Entradas: <b>{numberToCurrencyBR(totals.entradas)}</b>{" "}
-              &nbsp;|&nbsp; Saídas: <b>{numberToCurrencyBR(totals.saidas)}</b>
+                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                        <select
+                          {...register(`rows.${index}.category`, {
+                            required: "Selecione uma categoria",
+                          })}
+                        >
+                          {PAYMENT_CATEGORIES.map((c) => (
+                            <option key={c || "empty"} value={c}>
+                              {c ? c : "Selecione..."}
+                            </option>
+                          ))}
+                        </select>
+                        {errors?.rows?.[index]?.category && (
+                          <div style={{ fontSize: 12, color: "crimson" }}>
+                            {errors.rows[index].category.message}
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                        <input
+                          inputMode="decimal"
+                          {...register(`rows.${index}.amount`, {
+                            required: "Obrigatório",
+                            valueAsNumber: true,
+                            validate: (v) => Number.isFinite(v) || "Número inválido",
+                          })}
+                          onChange={(e) => {
+                            // permite digitar em pt-BR sem quebrar, e ainda manter número no estado
+                            const n = toNumberBR(e.target.value);
+                            setValue(
+                              `rows.${index}.amount`,
+                              Number.isFinite(n) ? n : 0,
+                              { shouldValidate: true }
+                            );
+                          }}
+                        />
+                        {errors?.rows?.[index]?.amount && (
+                          <div style={{ fontSize: 12, color: "crimson" }}>
+                            {errors.rows[index].amount.message}
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
+                        <button type="button" onClick={() => remove(index)}>
+                          Apagar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </form>
-      )}
+
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                marginTop: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <button type="button" onClick={addRow}>
+                Adicionar linha
+              </button>
+
+              <button type="submit">Salvar</button>
+
+              <div style={{ marginLeft: "auto", opacity: 0.85 }}>
+                Entradas: <b>{numberToCurrencyBR(totals.entradas)}</b> &nbsp;|&nbsp;
+                Saídas: <b>{numberToCurrencyBR(totals.saidas)}</b>
+              </div>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
