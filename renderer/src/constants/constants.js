@@ -7,5 +7,17 @@ export const INSTITUTIONS = [
   "Santander",
   "Caixa",
   "Inter",
-  "Mercado Pago"
+  "Mercado Pago",
+];
+
+export const PAYMENT_CATEGORIES = [
+  "",
+  "Saúde",
+  "Pagamentos",
+  "Alimentação",
+  "Transporte",
+  "Educação",
+  "Lazer",
+  "Presentes",
+  "Outros",
 ];

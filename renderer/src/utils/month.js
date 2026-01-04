@@ -1,4 +1,3 @@
-// utils/month.js
 export function pad2(n) {
   return String(n).padStart(2, "0");
 }
@@ -16,6 +15,7 @@ export function defaultMonthData(year, month) {
   return {
     month: monthKey(year, month),
     assets: [],
+    statement: [],
     totals: { netWorth: 0 },
     meta: { copiedFrom: null, notes: "" },
   };

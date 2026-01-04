@@ -1,9 +1,6 @@
-import React from "react";
 import { useForm } from "react-hook-form";
-
-import { TYPES, INSTITUTIONS } from "/src/constants/constants"; 
-// Se você ainda não tiver INSTITUTIONS, pode criar assim:
-// export const INSTITUTIONS = ["Nubank", "Itaú", "Bradesco", "Santander", "Caixa", "Inter"];
+import { TYPES, INSTITUTIONS } from "/src/constants/constants";
+import { ASSETS_DEFAULT_COLUMNS } from "/src/constants/columns";
 
 export default function AssetEditor({ onAdd }) {
   const {
@@ -12,13 +9,8 @@ export default function AssetEditor({ onAdd }) {
     reset,
     formState: { errors, isSubmitting },
   } = useForm({
-    defaultValues: {
-      name: "",
-      type: "cash",
-      institution: "",
-      total: "",
-    },
-    mode: "onSubmit", // ou "onChange" se quiser validar enquanto digita
+    defaultValues: ASSETS_DEFAULT_COLUMNS,
+    mode: "onSubmit",
   });
 
   function toNumberBR(value) {
@@ -40,12 +32,21 @@ export default function AssetEditor({ onAdd }) {
       lastUpdate: new Date().toISOString().slice(0, 10),
     });
 
-    reset(); // volta para defaultValues
+    reset();
   };
 
   return (
-    <div style={{ border: "1px solid #3333", padding: 12, borderRadius: 8, marginTop: 12 }}>
-      <h3 style={{ margin: "0 0 10px" }}>Adicionar ativo</h3>
+    <div
+      style={{
+        border: "1px solid #3333",
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 12,
+      }}
+    >
+      <span style={{ margin: "0 0 10px", color: "gray", fontSize: "0.8rem" }}>
+        Adicionar ativo
+      </span>
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -59,7 +60,9 @@ export default function AssetEditor({ onAdd }) {
               })}
             />
             {errors.name && (
-              <span style={{ fontSize: 12, color: "crimson" }}>{errors.name.message}</span>
+              <span style={{ fontSize: 12, color: "crimson" }}>
+                {errors.name.message}
+              </span>
             )}
           </label>
 
@@ -73,7 +76,9 @@ export default function AssetEditor({ onAdd }) {
               ))}
             </select>
             {errors.type && (
-              <span style={{ fontSize: 12, color: "crimson" }}>{errors.type.message}</span>
+              <span style={{ fontSize: 12, color: "crimson" }}>
+                {errors.type.message}
+              </span>
             )}
           </label>
 
@@ -116,11 +121,19 @@ export default function AssetEditor({ onAdd }) {
               })}
             />
             {errors.total && (
-              <span style={{ fontSize: 12, color: "crimson" }}>{errors.total.message}</span>
+              <span style={{ fontSize: 12, color: "crimson" }}>
+                {errors.total.message}
+              </span>
             )}
           </label>
 
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-end",
+            }}
+          >
             <button type="submit" disabled={isSubmitting}>
               Adicionar
             </button>

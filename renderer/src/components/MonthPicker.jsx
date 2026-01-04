@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function MonthPicker({
   year,
   month,
@@ -15,10 +13,15 @@ export default function MonthPicker({
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
-    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+    <div
+      style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}
+    >
       <label>
         Ano:{" "}
-        <select value={year} onChange={(e) => onChange({ year: Number(e.target.value), month })}>
+        <select
+          value={year}
+          onChange={(e) => onChange({ year: Number(e.target.value), month })}
+        >
           {years.map((y) => (
             <option key={y} value={y}>
               {y}
@@ -29,7 +32,10 @@ export default function MonthPicker({
 
       <label>
         Mês:{" "}
-        <select value={month} onChange={(e) => onChange({ year, month: Number(e.target.value) })}>
+        <select
+          value={month}
+          onChange={(e) => onChange({ year, month: Number(e.target.value) })}
+        >
           {months.map((m) => (
             <option key={m} value={m}>
               {String(m).padStart(2, "0")}
