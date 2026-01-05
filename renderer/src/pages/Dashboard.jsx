@@ -6,6 +6,7 @@ import AssetEditor from "../components/AssetEditor.jsx";
 import AssetsTable from "../components/AssetsTable.jsx";
 import StatementImporter from "../components/StatmentImporter.jsx";
 import StatementTable from "../components/StatementTable.jsx";
+import { Page } from "../components/Page.jsx";
 
 import {
   computeTotals,
@@ -13,6 +14,7 @@ import {
   getNowYearMonth,
   monthKey,
 } from "../utils/month.js";
+import { generateMonthSummary } from "../utils/data.js";
 
 /**
  * Ponto inicial da aplicação.
@@ -26,9 +28,10 @@ export default function Dashboard() {
   const [monthData, setMonthData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savingLoading, setSavingLoading] = useState(false);
+  const [tab, setTab] = useState("user-amount");
 
   /**
-   * Baseado no ano, resgata os dados do banco de dados e atribui à estados.
+   * Baseado no ano, resgata os dados do banco de dados e atribui ao estado MonthData.
    */
   async function loadCurrentMonthData() {
     setLoading(true);
@@ -60,6 +63,8 @@ export default function Dashboard() {
     return total;
   }, [assets]);
 
+  const summaryData = useMemo(() => generateMonthSummary(monthData), [monthData]);
+
   /**
    * Salva todos os dados do mês que está sendo editado. Edita o valor total
    * do balanço antes de inserir.
@@ -70,7 +75,7 @@ export default function Dashboard() {
     setSavingLoading(true);
     try {
       const fixedWithTotalBalance = computeTotals(nextData);
-      console.warn(fixedWithTotalBalance)
+      console.warn(fixedWithTotalBalance);
       await financeApi.monthsUpsert({ year, month, data: fixedWithTotalBalance });
       await loadCurrentMonthData();
     } finally {
@@ -211,13 +216,13 @@ export default function Dashboard() {
    * Salva todas as linhas importadas para o extrato de um arquivo no banco de dados
    * com os demais extratos já inseridos. Função chamada no onSubmit do RHF apenas
    * quando todas as linhas estão validadas.
-   * 
+   *
    * @param {Object[]} fixedImportedStatement Linhas de extrato importadas e validadas.
    */
   function handleSaveStatementRows(fixedImportedStatement) {
     const base = data ?? defaultMonthData(year, month);
     const current = base.statement || [];
-    const nextData = current.concat(fixedImportedStatement)
+    const nextData = current.concat(fixedImportedStatement);
     saveData({ ...base, statement: nextData });
   }
 
@@ -263,15 +268,6 @@ export default function Dashboard() {
             })}
           </div>
         </div>
-
-        <div style={{ opacity: 0.85 }}>
-          {loading
-            ? "Carregando..."
-            : setMonthData
-            ? `Atualizado em: ${setMonthData.updated_at}`
-            : "Mês não existe ainda."}
-          {savingLoading ? " (salvando...)" : ""}
-        </div>
       </div>
 
       {!setMonthData && (
@@ -283,30 +279,39 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div style={{ marginTop: 6 }}>
-        <h3 style={{ margin: "10px 0" }}>Ativos do mês</h3>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={() => setTab("summary")}>Resumo mensal</button>
+        <button onClick={() => setTab("user-amount")}>Saldo patrimonial</button>
+        <button onClick={() => setTab("statement")}>Extrato</button>
+        <button onClick={() => setTab("notes")}>Notas</button>
+      </div>
+
+      <Page id="summary" active={tab} title="Resumo do mês">
+        <pre style={{ background: "#f6f6f6", padding: 12, borderRadius: 8 }}>
+          {JSON.stringify(summaryData, null, 2)}
+        </pre>
+      </Page>
+
+      <Page id="user-amount" active={tab} title="Ativos do mês">
         <AssetEditor onAdd={handleAddAsset} />
         <AssetsTable
           assets={assets}
           onUpdateAsset={handleUpdateAsset}
           onRemoveAsset={handleRemoveAsset}
         />
-      </div>
+      </Page>
 
-      <div style={{ marginTop: 6 }}>
-        <h3 style={{ margin: "10px 0" }}>Histórico do extrato mensal</h3>
+      <Page id="statement" active={tab} title="Histórico do extrato mensal">
         <StatementImporter onImport={handleSaveStatementRows} />
-
         <StatementTable
           rows={statement}
           onAddRow={handleAddStatementRow}
           onUpdateRow={handleUpdateStatementRow}
           onRemoveRow={handleRemoveStatementRow}
         />
-      </div>
+      </Page>
 
-      <div style={{ marginTop: 10 }}>
-        <h3 style={{ margin: "10px 0" }}>Notas do mês</h3>
+      <Page id="notes" active={tab} title="Notas do mês">
         <textarea
           rows={4}
           style={{ width: "100%", padding: 10 }}
@@ -321,7 +326,7 @@ export default function Dashboard() {
           }}
           placeholder="Ex: mudanças na carteira, observações..."
         />
-      </div>
+      </Page>
     </div>
   );
 }
