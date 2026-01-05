@@ -15,6 +15,7 @@ import {
   monthKey,
 } from "../utils/month.js";
 import { generateMonthSummary } from "../utils/data.js";
+import { ISODateToBR } from "/src/utils/formatter.js";
 
 /**
  * Ponto inicial da aplicação.
@@ -327,6 +328,10 @@ export default function Dashboard() {
           placeholder="Ex: mudanças na carteira, observações..."
         />
       </Page>
+
+      {monthData && (
+        <span>Última modificação: {ISODateToBR(monthData.updated_at)}</span>
+      )}
     </div>
   );
 }

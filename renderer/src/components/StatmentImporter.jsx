@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import { numberToCurrencyBR } from "/src/utils/formater.js";
+import { numberToCurrencyBR } from "/src/utils/formatter.js";
 import { PAYMENT_CATEGORIES } from "/src/constants/constants";
 
 /**

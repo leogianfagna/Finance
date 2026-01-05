@@ -13,3 +13,14 @@ export function numberToCurrencyBR(value) {
 
   return prefix + formatter.format(Math.abs(value));
 }
+
+export function ISODateToBR(dataISO) {
+  if (!dataISO) return "";
+  const data = new Date(dataISO);
+
+  return data.toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "medium",
+    timeZone: "America/Sao_Paulo",
+  });
+}
