@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { numberToCurrencyBR } from "/src/utils/formatter.js";
-import { PAYMENT_CATEGORIES } from "/src/constants/constants";
+import { PAYMENT_CATEGORIES, INSTITUTIONS } from "/src/constants/constants";
 
 /**
  * Espera CSV com colunas: Data, Valor, Identificador, Descrição
@@ -135,7 +135,7 @@ function parseCSV(text) {
   return rows;
 }
 
-export default function StatementImporter({onImport}) {
+export default function StatementImporter({ onImport }) {
   const [fileName, setFileName] = useState("");
 
   const {
@@ -162,7 +162,7 @@ export default function StatementImporter({onImport}) {
     let saidas = 0;
 
     for (const r of fields) {
-      const v = Number(r.valor);
+      const v = Number(r.amount);
       if (Number.isFinite(v)) {
         if (v < 0) saidas += v;
         else entradas += v;
@@ -209,9 +209,7 @@ export default function StatementImporter({onImport}) {
   }
 
   const onSave = (data) => {
-    console.log("Salvo!");
-    // futuramente: enviar pro backend / estado global etc
-    onImport(data.rows)
+    onImport(data.rows);
   };
 
   return (
@@ -252,6 +250,35 @@ export default function StatementImporter({onImport}) {
           >
             Limpar
           </button>
+        </div>
+
+        <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column" }}>
+          <span style={{ fontWeight: "bold" }}>Referência</span>
+
+          <label>
+            <span>Instituição</span>
+            <select
+              {...register("bank", {
+                required: "Selecione uma categoria",
+              })}
+            >
+              {INSTITUTIONS.map((bank, i) => (
+                <option key={`${bank}-${i}`}>{bank}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Tipo de pagamento</span>
+            <select
+              {...register("transfer_type", {
+                required: "Selecione uma categoria",
+              })}
+            >
+              <option value={"debito"}>Débito</option>
+              <option value={"credito"}>Crédito</option>
+            </select>
+          </label>
         </div>
 
         {!fields.length ? (
