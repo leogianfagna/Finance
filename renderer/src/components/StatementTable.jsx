@@ -18,14 +18,31 @@ function uid() {
   return crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
-export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRow }) {
+function calculateSummary(data) {
+  let worthIn = 0;
+  let worthOut = 0;
+
+  data.forEach(({ amount }) => {
+    if (amount < 0) worthOut += amount;
+    if (amount > 0) worthIn += amount;
+  });
+
+  return { in: worthIn, out: worthOut, total: worthOut + worthIn };
+}
+
+export default function StatementTable({
+  rows,
+  onAddRow,
+  onUpdateRow,
+  onRemoveRow,
+}) {
   const [draft, setDraft] = useState({
     date: "",
     description: "",
     category: "",
     amount: "",
     type: "debit",
-    account: ""
+    account: "",
   });
 
   const sorted = useMemo(() => {
@@ -34,13 +51,7 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
     );
   }, [rows]);
 
-  const total = useMemo(() => {
-    // saldo do extrato (credit positivo, debit negativo)
-    return sorted.reduce((acc, r) => {
-      const amt = Number(r.amount) || 0;
-      return acc + (r.type === "debit" ? -amt : amt);
-    }, 0);
-  }, [sorted]);
+  const statitics = useMemo(() => calculateSummary(sorted), [sorted]);
 
   function handleAdd() {
     const amount = parseBRNumber(draft.amount);
@@ -64,78 +75,98 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
       category: "",
       amount: "",
       type: "debit",
-      account: ""
+      account: "",
     });
   }
 
   return (
-    <div style={{ border: "1px solid #3333", borderRadius: 10, padding: 12 }}>
-      {/* Add row */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, opacity: 0.8 }}>Data</label>
-          <input
-            type="date"
-            value={draft.date}
-            onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-          />
-        </div>
+    <>
+      <div
+        style={{
+          border: "1px solid #3333",
+          borderRadius: 10,
+          padding: 12,
+          marginTop: "1rem",
+        }}
+      >
+        {/* Add row */}
+        <div
+          style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, opacity: 0.8 }}>Data</label>
+            <input
+              type="date"
+              value={draft.date}
+              onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
+            />
+          </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
-          <label style={{ fontSize: 12, opacity: 0.8 }}>Descrição</label>
-          <input
-            value={draft.description}
-            onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-            placeholder="Ex: Mercado / Uber / Salário"
-          />
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, opacity: 0.8 }}>Tipo</label>
-          <select
-            value={draft.type}
-            onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              minWidth: 220,
+            }}
           >
-            <option value="debit">Débito</option>
-            <option value="credit">Crédito</option>
-          </select>
-        </div>
+            <label style={{ fontSize: 12, opacity: 0.8 }}>Descrição</label>
+            <input
+              value={draft.description}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, description: e.target.value }))
+              }
+              placeholder="Ex: Mercado / Uber / Salário"
+            />
+          </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, opacity: 0.8 }}>Valor</label>
-          <input
-            value={draft.amount}
-            onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
-            placeholder="Ex: 123,45"
-            inputMode="decimal"
-          />
-        </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, opacity: 0.8 }}>Tipo</label>
+            <select
+              value={draft.type}
+              onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
+            >
+              <option value="debit">Débito</option>
+              <option value="credit">Crédito</option>
+            </select>
+          </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, opacity: 0.8 }}>Categoria</label>
-          <input
-            value={draft.category}
-            onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
-            placeholder="Ex: Alimentação"
-          />
-        </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, opacity: 0.8 }}>Valor</label>
+            <input
+              value={draft.amount}
+              onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
+              placeholder="Ex: 123,45"
+              inputMode="decimal"
+            />
+          </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 12, opacity: 0.8 }}>Conta</label>
-          <input
-            value={draft.account}
-            onChange={(e) => setDraft((d) => ({ ...d, account: e.target.value }))}
-            placeholder="Ex: Nubank"
-          />
-        </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, opacity: 0.8 }}>Categoria</label>
+            <input
+              value={draft.category}
+              onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
+              placeholder="Ex: Alimentação"
+            />
+          </div>
 
-        <button onClick={handleAdd} style={{ padding: "6px 10px" }}>
-          Adicionar
-        </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 12, opacity: 0.8 }}>Conta</label>
+            <input
+              value={draft.account}
+              onChange={(e) => setDraft((d) => ({ ...d, account: e.target.value }))}
+              placeholder="Ex: Nubank"
+            />
+          </div>
+
+          <button onClick={handleAdd} style={{ padding: "6px 10px" }}>
+            Adicionar
+          </button>
+        </div>
       </div>
 
       <div style={{ marginTop: 10, opacity: 0.85, fontSize: 13 }}>
-        Saldo (crédito - débito): <b>{toBRL(total)}</b>
+        Entrada: {toBRL(statitics.in)} | Saída: {toBRL(statitics.out)}
       </div>
 
       {/* Table */}
@@ -174,7 +205,9 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
                   <td style={{ padding: 8 }}>
                     <input
                       value={r.description || ""}
-                      onChange={(e) => onUpdateRow?.(r.id, { description: e.target.value })}
+                      onChange={(e) =>
+                        onUpdateRow?.(r.id, { description: e.target.value })
+                      }
                       style={{ width: 260 }}
                     />
                   </td>
@@ -192,24 +225,31 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
                   <td style={{ padding: 8 }}>
                     <input
                       value={String(r.amount ?? "")}
-                      onChange={(e) => onUpdateRow?.(r.id, { amount: parseBRNumber(e.target.value) })}
+                      onChange={(e) =>
+                        onUpdateRow?.(r.id, {
+                          amount: parseBRNumber(e.target.value),
+                        })
+                      }
                       style={{ width: 120 }}
                       inputMode="decimal"
                     />
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>{toBRL(r.amount)}</div>
                   </td>
 
                   <td style={{ padding: 8 }}>
                     <input
                       value={r.category || ""}
-                      onChange={(e) => onUpdateRow?.(r.id, { category: e.target.value })}
+                      onChange={(e) =>
+                        onUpdateRow?.(r.id, { category: e.target.value })
+                      }
                     />
                   </td>
 
                   <td style={{ padding: 8 }}>
                     <input
                       value={r.account || ""}
-                      onChange={(e) => onUpdateRow?.(r.id, { account: e.target.value })}
+                      onChange={(e) =>
+                        onUpdateRow?.(r.id, { account: e.target.value })
+                      }
                     />
                   </td>
 
@@ -229,6 +269,6 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
           </tbody>
         </table>
       </div>
-    </div>
+    </>
   );
 }
