@@ -1,3 +1,10 @@
+/**
+ * Gera as estatísticas de um determinado mês, resgatadas com monthData no
+ * Dashboard.
+ * 
+ * @param {Object} data Dados resgatados do banco de dados em JSON.
+ * @returns {Object} Dados agrupados para alimentar UI.
+ */
 export function generateMonthSummary(data) {
   if (!data) return {};
   const assets = data.data?.assets || [];

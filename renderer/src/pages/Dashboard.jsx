@@ -287,7 +287,6 @@ export default function Dashboard() {
       </div>
 
       <Page id="summary" active={tab} title="Resumo do mês">
-        <span>todo</span>
         <pre style={{ background: "#f6f6f6", padding: 12, borderRadius: 8 }}>
           {JSON.stringify(summaryData, null, 2)}
         </pre>
