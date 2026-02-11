@@ -1,16 +1,23 @@
 import { useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
+import {
+  Alert,
+  Box,
+  Button,
+  MenuItem,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { numberToCurrencyBR } from "/src/utils/formatter.js";
 import { PAYMENT_CATEGORIES, INSTITUTIONS } from "/src/constants/constants";
-
-/**
- * Espera CSV com colunas: Data, Valor, Identificador, Descrição
- * - "Identificador" é descartado
- * - "categoria" começa vazia
- *
- * Observação: Excel (.xlsx/.xls) aqui fica implementado como "placeholder" (mensagem),
- * porque precisa de uma lib (ex: xlsx). Se quiser, eu já te devolvo a versão com xlsx também.
- */
 
 function normalizeHeader(h) {
   return String(h || "")
@@ -22,24 +29,16 @@ function normalizeHeader(h) {
 
 function toNumberBR(value) {
   if (value == null) return NaN;
-
   const s = String(value).trim();
   if (!s) return NaN;
-
   const normalized = s.replace(/\./g, "").replace(",", ".");
   return Number(normalized);
 }
 
 function parseDateToISO(d) {
-  // tenta reconhecer:
-  // - "YYYY-MM-DD" (já ok)
-  // - "DD/MM/YYYY"
-  // - "DD-MM-YYYY"
-  // se falhar, retorna ""
   if (!d) return "";
   const s = String(d).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-
   const m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
   if (m) {
     const dd = m[1];
@@ -57,16 +56,13 @@ function sanitizeDescription(s) {
 }
 
 function splitCSVLine(line) {
-  // split simples com suporte a aspas (bom o suficiente para CSVs comuns)
   const out = [];
   let cur = "";
   let inQuotes = false;
 
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
-
     if (ch === '"') {
-      // trata aspas escapadas ""
       if (inQuotes && line[i + 1] === '"') {
         cur += '"';
         i++;
@@ -102,11 +98,7 @@ function parseCSV(text) {
 
   const idxData = headers.indexOf("data");
   const idxValor = headers.indexOf("valor");
-  const idxDesc = headers.indexOf("descricao"); // sem acento
-  // "identificador" pode existir e é ignorado
-
-  // fallback: tenta achar "descrição" normalizado
-  // (normalizeHeader já remove acento, então "descrição" vira "descricao")
+  const idxDesc = headers.indexOf("descricao");
 
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
@@ -116,17 +108,12 @@ function parseCSV(text) {
     const valorRaw = idxValor >= 0 ? cols[idxValor] : "";
     const descRaw = idxDesc >= 0 ? cols[idxDesc] : "";
 
-    const isoDate = parseDateToISO(dataRaw);
-    const n = parseFloat(valorRaw);
-
-    // valor na tabela fica como número (sempre positivo/negativo como veio)
-    // usuário pode editar depois
     rows.push({
       id: crypto.randomUUID?.() || String(Date.now() + i),
-      date: isoDate,
+      date: parseDateToISO(dataRaw),
       description: sanitizeDescription(descRaw),
       category: "",
-      amount: Number.isFinite(n) ? n : 0,
+      amount: Number.isFinite(toNumberBR(valorRaw)) ? toNumberBR(valorRaw) : 0,
       account: "to-do",
       type: "to-do",
     });
@@ -147,6 +134,8 @@ export default function StatementImporter({ onImport }) {
   } = useForm({
     defaultValues: {
       rows: [],
+      bank: INSTITUTIONS[0],
+      transfer_type: "debito",
     },
     mode: "onSubmit",
   });
@@ -160,7 +149,6 @@ export default function StatementImporter({ onImport }) {
   const totals = useMemo(() => {
     let entradas = 0;
     let saidas = 0;
-
     for (const r of fields) {
       const v = Number(r.amount);
       if (Number.isFinite(v)) {
@@ -168,34 +156,28 @@ export default function StatementImporter({ onImport }) {
         else entradas += v;
       }
     }
-
     return { entradas, saidas };
   }, [fields]);
 
   async function handleFile(file) {
     if (!file) return;
-
     setFileName(file.name);
-    const fileExtenstionType = file.name.toLowerCase().split(".").pop();
+    const extension = file.name.toLowerCase().split(".").pop();
 
-    if (fileExtenstionType === "csv") {
+    if (extension === "csv") {
       const fileInText = await file.text();
-      const parsed = parseCSV(fileInText);
-      console.log(parsed);
-      replace(parsed);
+      replace(parseCSV(fileInText));
       return;
     }
 
-    // Excel (xlsx/xls) — placeholder (precisa lib xlsx)
-    if (fileExtenstionType === "xlsx" || fileExtenstionType === "xls") {
-      alert("Importação de Excel ainda não está habilitada. Use CSV por enquanto.");
+    if (extension === "xlsx" || extension === "xls") {
+      alert("Importacao de Excel ainda nao esta habilitada. Use CSV por enquanto.");
       return;
     }
 
-    alert("Formato não suportado. Envie um CSV ou Excel.");
+    alert("Formato nao suportado. Envie um CSV ou Excel.");
   }
 
-  // to-do: alinhar com StatementTable que essa mesma formação é repetida diversas vezes
   function addRow() {
     append({
       id: crypto.randomUUID?.() || String(Date.now()),
@@ -213,212 +195,177 @@ export default function StatementImporter({ onImport }) {
   };
 
   return (
-    <div
-      style={{
-        borderRadius: 8,
-        marginTop: 12,
-      }}
-    >
-      <div style={{ border: "1px solid #3333", borderRadius: "6px", padding: 12 }}>
-        <span style={{ fontSize: "1.1rem" }}>Importar histórico</span>
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            flexWrap: "wrap",
-            marginTop: "0.5rem",
-          }}
-        >
+    <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Typography variant="subtitle1" mb={1.2}>
+        Importar historico
+      </Typography>
+
+      <Stack direction={{ xs: "column", md: "row" }} gap={1} alignItems={{ md: "center" }}>
+        <Button component="label" variant="contained">
+          Escolher arquivo
           <input
+            hidden
             type="file"
             accept=".csv,.xlsx,.xls"
             onChange={(e) => handleFile(e.target.files?.[0])}
           />
-          {fileName && (
-            <span style={{ opacity: 0.85 }}>
-              Arquivo: <b>{fileName}</b>
-            </span>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              replace([]);
-              setFileName("");
-            }}
-          >
-            Limpar
-          </button>
-        </div>
-
-        <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column" }}>
-          <span style={{ fontWeight: "bold" }}>Referência</span>
-
-          <label>
-            <span>Instituição</span>
-            <select
-              {...register("bank", {
-                required: "Selecione uma categoria",
-              })}
-            >
-              {INSTITUTIONS.map((bank, i) => (
-                <option key={`${bank}-${i}`}>{bank}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            <span>Tipo de pagamento</span>
-            <select
-              {...register("transfer_type", {
-                required: "Selecione uma categoria",
-              })}
-            >
-              <option value={"debito"}>Débito</option>
-              <option value={"credito"}>Crédito</option>
-            </select>
-          </label>
-        </div>
-
-        {!fields.length ? (
-          <p style={{ opacity: 0.8, marginTop: 12 }}>
-            Nenhuma linha importada ainda.
-          </p>
-        ) : (
-          <form onSubmit={handleSubmit(onSave)}>
-            <div style={{ marginTop: 12, overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ textAlign: "left" }}>
-                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      Data
-                    </th>
-                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      Descrição
-                    </th>
-                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      Categoria
-                    </th>
-                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      Valor
-                    </th>
-                    <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {fields.map((row, index) => (
-                    <tr key={row.keyId}>
-                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                        <input
-                          type="date"
-                          {...register(`rows.${index}.date`, {
-                            required: "Obrigatório",
-                          })}
-                        />
-                        {errors?.rows?.[index]?.date && (
-                          <div style={{ fontSize: 12, color: "crimson" }}>
-                            {errors.rows[index].date.message}
-                          </div>
-                        )}
-                      </td>
-
-                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                        <input
-                          style={{ width: 280 }}
-                          placeholder="Descrição"
-                          {...register(`rows.${index}.description`, {
-                            required: "Obrigatório",
-                            validate: (v) => v.trim().length > 0 || "Obrigatório",
-                          })}
-                        />
-                        {errors?.rows?.[index]?.description && (
-                          <div style={{ fontSize: 12, color: "crimson" }}>
-                            {errors.rows[index].description.message}
-                          </div>
-                        )}
-                      </td>
-
-                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                        <select
-                          {...register(`rows.${index}.category`, {
-                            required: "Selecione uma categoria",
-                          })}
-                        >
-                          {PAYMENT_CATEGORIES.map((c) => (
-                            <option key={c || "empty"} value={c}>
-                              {c ? c : "Selecione..."}
-                            </option>
-                          ))}
-                        </select>
-                        {errors?.rows?.[index]?.category && (
-                          <div style={{ fontSize: 12, color: "crimson" }}>
-                            {errors.rows[index].category.message}
-                          </div>
-                        )}
-                      </td>
-
-                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                        <input
-                          inputMode="decimal"
-                          {...register(`rows.${index}.amount`, {
-                            required: "Obrigatório",
-                            valueAsNumber: true,
-                            validate: (v) => Number.isFinite(v) || "Número inválido",
-                          })}
-                          onChange={(e) => {
-                            // permite digitar em pt-BR sem quebrar, e ainda manter número no estado
-                            const n = toNumberBR(e.target.value);
-                            setValue(
-                              `rows.${index}.amount`,
-                              Number.isFinite(n) ? n : 0,
-                              { shouldValidate: true }
-                            );
-                          }}
-                        />
-                        {errors?.rows?.[index]?.amount && (
-                          <div style={{ fontSize: 12, color: "crimson" }}>
-                            {errors.rows[index].amount.message}
-                          </div>
-                        )}
-                      </td>
-
-                      <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                        <button type="button" onClick={() => remove(index)}>
-                          Apagar
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                marginTop: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <button type="button" onClick={addRow}>
-                Adicionar linha
-              </button>
-
-              <button type="submit">Salvar</button>
-
-              <div style={{ marginLeft: "auto", opacity: 0.85 }}>
-                Entradas: <b>{numberToCurrencyBR(totals.entradas)}</b> &nbsp;|&nbsp;
-                Saídas: <b>{numberToCurrencyBR(totals.saidas)}</b>
-              </div>
-            </div>
-          </form>
+        </Button>
+        {fileName && (
+          <Typography color="text.secondary">
+            Arquivo: <b>{fileName}</b>
+          </Typography>
         )}
-      </div>
-    </div>
+        <Button
+          variant="outlined"
+          onClick={() => {
+            replace([]);
+            setFileName("");
+          }}
+        >
+          Limpar
+        </Button>
+      </Stack>
+
+      <Stack direction={{ xs: "column", md: "row" }} gap={1.1} mt={1.6}>
+        <TextField
+          select
+          label="Instituicao"
+          size="small"
+          defaultValue={INSTITUTIONS[0]}
+          {...register("bank", { required: "Selecione uma instituicao" })}
+          sx={{ minWidth: 200 }}
+        >
+          {INSTITUTIONS.map((bank, i) => (
+            <MenuItem key={`${bank}-${i}`} value={bank}>
+              {bank}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          select
+          label="Tipo de pagamento"
+          size="small"
+          defaultValue="debito"
+          {...register("transfer_type", { required: "Selecione um tipo" })}
+          sx={{ minWidth: 200 }}
+        >
+          <MenuItem value="debito">Debito</MenuItem>
+          <MenuItem value="credito">Credito</MenuItem>
+        </TextField>
+      </Stack>
+
+      {!fields.length ? (
+        <Typography color="text.secondary" mt={2}>
+          Nenhuma linha importada ainda.
+        </Typography>
+      ) : (
+        <Box component="form" onSubmit={handleSubmit(onSave)}>
+          <TableContainer sx={{ mt: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Data</TableCell>
+                  <TableCell>Descricao</TableCell>
+                  <TableCell>Categoria</TableCell>
+                  <TableCell>Valor</TableCell>
+                  <TableCell align="right">Acoes</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {fields.map((row, index) => (
+                  <TableRow key={row.keyId}>
+                    <TableCell>
+                      <TextField
+                        size="small"
+                        type="date"
+                        error={Boolean(errors?.rows?.[index]?.date)}
+                        helperText={errors?.rows?.[index]?.date?.message}
+                        {...register(`rows.${index}.date`, {
+                          required: "Obrigatorio",
+                        })}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        size="small"
+                        sx={{ minWidth: 260 }}
+                        placeholder="Descricao"
+                        error={Boolean(errors?.rows?.[index]?.description)}
+                        helperText={errors?.rows?.[index]?.description?.message}
+                        {...register(`rows.${index}.description`, {
+                          required: "Obrigatorio",
+                          validate: (v) => v.trim().length > 0 || "Obrigatorio",
+                        })}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        select
+                        size="small"
+                        error={Boolean(errors?.rows?.[index]?.category)}
+                        helperText={errors?.rows?.[index]?.category?.message}
+                        defaultValue=""
+                        {...register(`rows.${index}.category`, {
+                          required: "Selecione uma categoria",
+                        })}
+                      >
+                        {PAYMENT_CATEGORIES.map((c) => (
+                          <MenuItem key={c || "empty"} value={c}>
+                            {c ? c : "Selecione..."}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        size="small"
+                        inputMode="decimal"
+                        error={Boolean(errors?.rows?.[index]?.amount)}
+                        helperText={errors?.rows?.[index]?.amount?.message}
+                        {...register(`rows.${index}.amount`, {
+                          required: "Obrigatorio",
+                          valueAsNumber: true,
+                          validate: (v) => Number.isFinite(v) || "Numero invalido",
+                        })}
+                        onChange={(e) => {
+                          const n = toNumberBR(e.target.value);
+                          setValue(`rows.${index}.amount`, Number.isFinite(n) ? n : 0, {
+                            shouldValidate: true,
+                          });
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button color="error" onClick={() => remove(index)}>
+                        Apagar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Stack direction={{ xs: "column", md: "row" }} gap={1} mt={1.5}>
+            <Button type="button" variant="outlined" onClick={addRow}>
+              Adicionar linha
+            </Button>
+            <Button type="submit" variant="contained">
+              Salvar
+            </Button>
+          </Stack>
+
+          <Stack direction={{ xs: "column", md: "row" }} gap={1} mt={1.2}>
+            <Alert severity="success" variant="outlined" sx={{ flex: 1 }}>
+              Entradas: <b>{numberToCurrencyBR(totals.entradas)}</b>
+            </Alert>
+            <Alert severity="warning" variant="outlined" sx={{ flex: 1 }}>
+              Saidas: <b>{numberToCurrencyBR(totals.saidas)}</b>
+            </Alert>
+          </Stack>
+        </Box>
+      )}
+    </Paper>
   );
 }
