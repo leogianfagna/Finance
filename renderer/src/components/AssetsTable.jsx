@@ -1,93 +1,135 @@
-import React from "react";
+import { useMemo } from "react";
+import { Box, IconButton, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import { TYPES, INSTITUTIONS } from "/src/constants/constants";
+import FinanceDataGrid from "./common/FinanceDataGrid.jsx";
 
 export default function AssetsTable({ assets, onUpdateAsset, onRemoveAsset }) {
-  if (!assets.length) return <p style={{ opacity: 0.8 }}>Sem ativos neste mês.</p>;
-
   function toNumberBR(value) {
     if (typeof value !== "string") return NaN;
     const normalized = value.replace(/\./g, "").replace(",", ".");
     return Number(normalized);
   }
 
+  const columns = useMemo(
+    () => [
+      {
+        field: "name",
+        headerName: "Nome",
+        flex: 1.3,
+        minWidth: 180,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            value={params.row.name || ""}
+            onChange={(e) => onUpdateAsset(params.row.id, { name: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "type",
+        headerName: "Tipo",
+        minWidth: 160,
+        flex: 1,
+        renderCell: (params) => (
+          <TextField
+            select
+            size="small"
+            fullWidth
+            value={params.row.type || "Saldo"}
+            onChange={(e) => onUpdateAsset(params.row.id, { type: e.target.value })}
+          >
+            {TYPES.map((t) => (
+              <MenuItem key={t} value={t}>
+                {t}
+              </MenuItem>
+            ))}
+          </TextField>
+        ),
+      },
+      {
+        field: "institution",
+        headerName: "Instituicao",
+        minWidth: 180,
+        flex: 1.1,
+        renderCell: (params) => (
+          <TextField
+            select
+            size="small"
+            fullWidth
+            value={params.row.institution || ""}
+            onChange={(e) => onUpdateAsset(params.row.id, { institution: e.target.value })}
+          >
+            <MenuItem value="" disabled>
+              Selecione...
+            </MenuItem>
+            {INSTITUTIONS.map((inst) => (
+              <MenuItem key={inst} value={inst}>
+                {inst}
+              </MenuItem>
+            ))}
+          </TextField>
+        ),
+      },
+      {
+        field: "total",
+        headerName: "Total",
+        minWidth: 150,
+        flex: 0.8,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            inputMode="decimal"
+            value={String(params.row.total ?? "")}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === "") {
+                onUpdateAsset(params.row.id, { total: 0 });
+                return;
+              }
+              const n = toNumberBR(raw);
+              onUpdateAsset(params.row.id, { total: Number.isFinite(n) ? n : 0 });
+            }}
+          />
+        ),
+      },
+      {
+        field: "actions",
+        headerName: "Acoes",
+        minWidth: 90,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: (params) => (
+          <IconButton color="error" onClick={() => onRemoveAsset(params.row.id)}>
+            <DeleteRoundedIcon />
+          </IconButton>
+        ),
+      },
+    ],
+    [onRemoveAsset, onUpdateAsset]
+  );
+
+  if (!assets.length) {
+    return (
+      <Stack
+        direction="row"
+        alignItems="center"
+        gap={1}
+        sx={{ border: "1px dashed", borderColor: "divider", borderRadius: 2, p: 2 }}
+      >
+        <AccountBalanceWalletRoundedIcon color="primary" />
+        <Typography color="text.secondary">Sem ativos neste mes.</Typography>
+      </Stack>
+    );
+  }
+
   return (
-    <div style={{ marginTop: 12, overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left" }}>
-            <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Nome</th>
-            <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Tipo</th>
-            <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Instituição</th>
-            <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Total</th>
-            <th style={{ borderBottom: "1px solid #3333", padding: 8 }}>Ações</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {assets.map((a) => (
-            <tr key={a.id}>
-              <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                <input
-                  value={a.name || ""}
-                  onChange={(e) => onUpdateAsset(a.id, { name: e.target.value })}
-                />
-              </td>
-
-              {/* Tipo agora é select (não texto) */}
-              <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                <select
-                  value={a.type || "cash"}
-                  onChange={(e) => onUpdateAsset(a.id, { type: e.target.value })}
-                >
-                  {TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </td>
-
-              {/* Instituição agora é select (não texto) */}
-              <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                <select
-                  value={a.institution || ""}
-                  onChange={(e) => onUpdateAsset(a.id, { institution: e.target.value })}
-                >
-                  <option value="" disabled>
-                    Selecione...
-                  </option>
-                  {INSTITUTIONS.map((inst) => (
-                    <option key={inst} value={inst}>
-                      {inst}
-                    </option>
-                  ))}
-                </select>
-              </td>
-
-              <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                <input
-                  inputMode="decimal"
-                  value={String(a.total ?? "")}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    // permite limpar o campo sem virar 0 imediatamente
-                    if (raw === "") {
-                      onUpdateAsset(a.id, { total: 0 });
-                      return;
-                    }
-                    const n = toNumberBR(raw);
-                    onUpdateAsset(a.id, { total: Number.isFinite(n) ? n : 0 });
-                  }}
-                />
-              </td>
-
-              <td style={{ borderBottom: "1px solid #3333", padding: 8 }}>
-                <button onClick={() => onRemoveAsset(a.id)}>Remover</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Box>
+      <FinanceDataGrid rows={assets} columns={columns} />
+    </Box>
   );
 }

@@ -1,4 +1,5 @@
 import { useForm } from "react-hook-form";
+import { Button, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
 import { TYPES, INSTITUTIONS } from "/src/constants/constants";
 import { ASSETS_DEFAULT_COLUMNS } from "/src/constants/columns";
 
@@ -14,7 +15,6 @@ export default function AssetEditor({ onAdd }) {
   });
 
   function toNumberBR(value) {
-    // aceita "1234.56" e também "1.234,56"
     if (typeof value !== "string") return NaN;
     const normalized = value.replace(/\./g, "").replace(",", ".");
     return Number(normalized);
@@ -36,110 +36,87 @@ export default function AssetEditor({ onAdd }) {
   };
 
   return (
-    <div
-      style={{
-        border: "1px solid #3333",
-        padding: 12,
-        borderRadius: 8,
-        marginTop: 12,
-      }}
-    >
-      <span style={{ margin: "0 0 10px", color: "gray", fontSize: "0.8rem" }}>
+    <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Typography variant="subtitle1" mb={1.2}>
         Adicionar ativo
-      </span>
+      </Typography>
 
       <form onSubmit={handleSubmit(onSubmit)}>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <label style={{ display: "flex", flexDirection: "column" }}>
-            Nome
-            <input
-              placeholder="Ex: Nubank"
-              {...register("name", {
-                required: "Informe o nome",
-                validate: (v) => v.trim().length > 0 || "Informe o nome",
-              })}
-            />
-            {errors.name && (
-              <span style={{ fontSize: 12, color: "crimson" }}>
-                {errors.name.message}
-              </span>
-            )}
-          </label>
+        <Stack direction={{ xs: "column", md: "row" }} gap={1.2} alignItems={{ md: "center" }}>
+          <TextField
+            label="Nome"
+            size="small"
+            placeholder="Ex: Nubank"
+            error={Boolean(errors.name)}
+            helperText={errors.name?.message}
+            {...register("name", {
+              required: "Informe o nome",
+              validate: (v) => v.trim().length > 0 || "Informe o nome",
+            })}
+          />
 
-          <label style={{ display: "flex", flexDirection: "column" }}>
-            Tipo
-            <select {...register("type", { required: "Selecione o tipo" })}>
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            {errors.type && (
-              <span style={{ fontSize: 12, color: "crimson" }}>
-                {errors.type.message}
-              </span>
-            )}
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column" }}>
-            Instituição
-            <select
-              {...register("institution", {
-                required: "Selecione a instituição",
-              })}
-            >
-              <option value="" disabled>
-                Selecione...
-              </option>
-              {INSTITUTIONS.map((inst) => (
-                <option key={inst} value={inst}>
-                  {inst}
-                </option>
-              ))}
-            </select>
-            {errors.institution && (
-              <span style={{ fontSize: 12, color: "crimson" }}>
-                {errors.institution.message}
-              </span>
-            )}
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column" }}>
-            Total (R$)
-            <input
-              inputMode="decimal"
-              placeholder="Ex: 1500,00"
-              {...register("total", {
-                required: "Informe o total",
-                validate: (v) => {
-                  const n = toNumberBR(v);
-                  if (!Number.isFinite(n)) return "Digite um número válido";
-                  if (n <= 0) return "O total deve ser maior que zero";
-                  return true;
-                },
-              })}
-            />
-            {errors.total && (
-              <span style={{ fontSize: 12, color: "crimson" }}>
-                {errors.total.message}
-              </span>
-            )}
-          </label>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "flex-end",
-            }}
+          <TextField
+            select
+            label="Tipo"
+            size="small"
+            error={Boolean(errors.type)}
+            helperText={errors.type?.message}
+            defaultValue={ASSETS_DEFAULT_COLUMNS.type}
+            sx={{ minWidth: 160 }}
+            {...register("type", { required: "Selecione o tipo" })}
           >
-            <button type="submit" disabled={isSubmitting}>
-              Adicionar
-            </button>
-          </div>
-        </div>
+            {TYPES.map((t) => (
+              <MenuItem key={t} value={t}>
+                {t}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            label="Instituicao"
+            size="small"
+            error={Boolean(errors.institution)}
+            helperText={errors.institution?.message}
+            defaultValue=""
+            sx={{ minWidth: 170 }}
+            {...register("institution", {
+              required: "Selecione a instituicao",
+            })}
+          >
+            <MenuItem value="" disabled>
+              Selecione...
+            </MenuItem>
+            {INSTITUTIONS.map((inst) => (
+              <MenuItem key={inst} value={inst}>
+                {inst}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            label="Total (R$)"
+            size="small"
+            inputMode="decimal"
+            placeholder="Ex: 1500,00"
+            error={Boolean(errors.total)}
+            helperText={errors.total?.message}
+            {...register("total", {
+              required: "Informe o total",
+              validate: (v) => {
+                const n = toNumberBR(v);
+                if (!Number.isFinite(n)) return "Digite um numero valido";
+                if (n <= 0) return "O total deve ser maior que zero";
+                return true;
+              },
+            })}
+          />
+
+          <Button type="submit" variant="contained" disabled={isSubmitting} sx={{ minWidth: 120 }}>
+            Adicionar
+          </Button>
+        </Stack>
       </form>
-    </div>
+    </Paper>
   );
 }

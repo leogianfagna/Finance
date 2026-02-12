@@ -1,25 +1,109 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Box,
+  Chip,
+  CircularProgress,
+  Grow,
+  Paper,
+  Slide,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
+import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
+import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
 import { financeApi } from "../api/financeApi.js";
-
 import MonthPicker from "../components/MonthPicker.jsx";
 import AssetEditor from "../components/AssetEditor.jsx";
 import AssetsTable from "../components/AssetsTable.jsx";
 import StatementImporter from "../components/StatmentImporter.jsx";
 import StatementTable from "../components/StatementTable.jsx";
-import { Page } from "../components/Page.jsx";
-
-import {
-  computeTotals,
-  defaultMonthData,
-  getNowYearMonth,
-  monthKey,
-} from "../utils/month.js";
+import MonthsOverview from "../components/MonthsOverview.jsx";
+import AppShell from "../components/layout/AppShell.jsx";
+import MetricCard from "../components/common/MetricCard.jsx";
+import { computeTotals, defaultMonthData, getNowYearMonth, monthKey } from "../utils/month.js";
 import { generateMonthSummary } from "../utils/data.js";
-import { ISODateToBR } from "/src/utils/formatter.js";
+import { ISODateToBR, numberToCurrencyBR } from "/src/utils/formatter.js";
 
-/**
- * Ponto inicial da aplicação.
- */
+const APP_MENU = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "historico", label: "Historico" },
+  { key: "faturas", label: "Faturas" },
+  { key: "notas", label: "Notas" },
+  { key: "meses", label: "Meses" },
+];
+
+function BreakdownCard({ title, rows }) {
+  return (
+    <Paper sx={{ p: 2, borderRadius: 2, height: "100%" }}>
+      <Typography variant="subtitle1" mb={1.1}>
+        {title}
+      </Typography>
+      {!rows.length ? (
+        <Typography color="text.secondary">Sem dados neste mes.</Typography>
+      ) : (
+        <Stack gap={0.9}>
+          {rows.map(([label, value]) => (
+            <Stack key={label} direction="row" justifyContent="space-between">
+              <Typography color="text.secondary">{label || "Nao informado"}</Typography>
+              <Typography fontWeight={600}>{numberToCurrencyBR(value)}</Typography>
+            </Stack>
+          ))}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+
+function InvoicesPanel({ rows }) {
+  const invoices = useMemo(() => {
+    return (rows || []).filter((item) => item.type === "credit" || item.category === "Pagamentos");
+  }, [rows]);
+
+  const total = useMemo(() => invoices.reduce((sum, row) => sum + (Number(row.amount) || 0), 0), [invoices]);
+
+  return (
+    <Stack gap={1.2}>
+      <Alert severity="info" variant="outlined">
+        Total de faturas identificadas: <b>{numberToCurrencyBR(total)}</b>
+      </Alert>
+      <Paper sx={{ p: 2, borderRadius: 3 }}>
+        <Typography variant="subtitle1" mb={1}>
+          Lancamentos de fatura ({invoices.length})
+        </Typography>
+        {!invoices.length ? (
+          <Typography color="text.secondary">Nao ha lancamentos de fatura para este mes.</Typography>
+        ) : (
+          <Stack gap={0.8}>
+            {invoices.map((row) => (
+              <Stack
+                key={row.id}
+                direction={{ xs: "column", md: "row" }}
+                justifyContent="space-between"
+                sx={{
+                  p: 1.2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1.5,
+                }}
+              >
+                <Typography>{row.description || "Sem descricao"}</Typography>
+                <Stack direction="row" gap={1} alignItems="center">
+                  <Chip size="small" label={row.date || "Sem data"} />
+                  <Typography fontWeight={600}>{numberToCurrencyBR(row.amount)}</Typography>
+                </Stack>
+              </Stack>
+            ))}
+          </Stack>
+        )}
+      </Paper>
+    </Stack>
+  );
+}
+
 export default function Dashboard() {
   const now = getNowYearMonth();
   const [year, setYear] = useState(now.year);
@@ -27,16 +111,16 @@ export default function Dashboard() {
   const selectedMonth = useMemo(() => monthKey(year, month), [year, month]);
 
   const [monthData, setMonthData] = useState(null);
+  const [monthsOverviewRows, setMonthsOverviewRows] = useState([]);
+  const [monthsOverviewLoading, setMonthsOverviewLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingLoading, setSavingLoading] = useState(false);
-  const [tab, setTab] = useState("user-amount");
+  const [page, setPage] = useState("dashboard");
 
-  /**
-   * Baseado no ano, resgata os dados do banco de dados e atribui ao estado MonthData.
-   */
   async function loadCurrentMonthData() {
     setLoading(true);
     try {
+      setMonthData(null);
       const row = await financeApi.monthsGet({ year, month });
       setMonthData(row);
     } finally {
@@ -44,11 +128,53 @@ export default function Dashboard() {
     }
   }
 
-  /**
-   * Carregar os dados da página, baseado no ano e mês selecionado.
-   */
+  async function loadMonthsOverview() {
+    setMonthsOverviewLoading(true);
+    try {
+      const list = await financeApi.monthsList();
+      if (!Array.isArray(list) || list.length === 0) {
+        setMonthsOverviewRows([]);
+        return;
+      }
+
+      const detailList = await Promise.all(
+        list.map((item) => financeApi.monthsGet({ year: item.year, month: item.month }))
+      );
+
+      const rows = list.map((item, idx) => {
+        const detail = detailList[idx];
+        const detailsData = detail?.data || defaultMonthData(item.year, item.month);
+        const assets = detailsData.assets || [];
+        const statementRows = detailsData.statement || [];
+        const netWorth =
+          Number(detailsData?.totals?.netWorth) ||
+          assets.reduce((sum, asset) => sum + (Number(asset.total) || 0), 0);
+        const statementTotal = statementRows.reduce(
+          (sum, statement) => sum + (Number(statement.amount) || 0),
+          0
+        );
+
+        return {
+          id: item.id || `${item.year}-${item.month}`,
+          month: monthKey(item.year, item.month),
+          netWorth,
+          assetsCount: assets.length,
+          statementCount: statementRows.length,
+          statementTotal,
+          updatedAt: ISODateToBR(detail?.updated_at || item.updated_at),
+          hasData: detail != null,
+        };
+      });
+
+      setMonthsOverviewRows(rows);
+    } finally {
+      setMonthsOverviewLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadCurrentMonthData();
+    loadMonthsOverview();
   }, [year, month]);
 
   const data = useMemo(() => {
@@ -60,166 +186,99 @@ export default function Dashboard() {
   const statement = useMemo(() => (data?.statement ? data.statement : []), [data]);
 
   const netWorth = useMemo(() => {
-    const total = assets.reduce((sum, a) => sum + (Number(a.total) || 0), 0);
-    return total;
+    return assets.reduce((sum, a) => sum + (Number(a.total) || 0), 0);
   }, [assets]);
 
   const summaryData = useMemo(() => generateMonthSummary(monthData), [monthData]);
+  const totalStatement = useMemo(
+    () => statement.reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
+    [statement]
+  );
 
-  /**
-   * Salva todos os dados do mês que está sendo editado. Edita o valor total
-   * do balanço antes de inserir.
-   *
-   * @param {Object} nextData Dados recebidos para inserir no banco.
-   */
   async function saveData(nextData) {
     setSavingLoading(true);
     try {
       const fixedWithTotalBalance = computeTotals(nextData);
-      console.warn(fixedWithTotalBalance);
       await financeApi.monthsUpsert({ year, month, data: fixedWithTotalBalance });
       await loadCurrentMonthData();
+      await loadMonthsOverview();
     } finally {
       setSavingLoading(false);
     }
   }
 
-  /**
-   * Lida quando um novo mês é criado para receber dados. Salva os dados do mês
-   * com um objeto vazio.
-   */
   async function handleCreateEmpty() {
     const empty = defaultMonthData(year, month);
     await saveData(empty);
   }
 
-  /**
-   * Copia do mês anterior os mesmos dados. Útil quando o usuário cria um novo
-   * mês e quer partir de uma base já pré preenchida.
-   */
   async function handleCopyFromPrevious() {
     setSavingLoading(true);
     try {
       await financeApi.monthsCopyFromPrevious({ year, month });
       await loadCurrentMonthData();
+      await loadMonthsOverview();
     } finally {
       setSavingLoading(false);
     }
   }
 
-  /**
-   * Apaga o mês atual. Quando isso é feito, é limpo os dados mas a página continua
-   * para o usuário.
-   */
   async function handleDelete() {
-    if (!confirm(`Excluir o mês ${selectedMonth}?`)) return;
+    if (!confirm(`Excluir o mes ${selectedMonth}?`)) return;
     setSavingLoading(true);
-
     try {
       await financeApi.monthsDelete({ year, month });
       setMonthData(null);
+      await loadMonthsOverview();
     } finally {
       setSavingLoading(false);
     }
   }
 
-  /**
-   * Lida com a inserção de novo "ativo" para a lista do usuário. Ou seja, uma nova
-   * linha apenas que contém os dados daquele saldo, com as colunas "id", "name",
-   * "institution" e afins.
-   *
-   * @param {Object} asset Objeto que representa o ativo sendo adicionado para a lista.
-   */
   function handleAddAsset(asset) {
     const base = data ?? defaultMonthData(year, month);
-    const next = {
+    saveData({
       ...base,
       assets: [...(base.assets || []), asset],
-    };
-    saveData(next);
+    });
   }
 
-  /**
-   * Alterar dados de uma linha específica de um asset. Essa função é usada dentro do
-   * AssetTable que imprime a tabela de dados, e o usuário pode editar diretamente na
-   * linha.
-   *
-   * @param {*} assetId Id (PK do banco de dados) do asset a ser modificado.
-   * @param {Object} patch Objeto com as chaves que sofreram alterações (espera-se apenas uma).
-   */
   function handleUpdateAsset(assetId, patch) {
     const base = data ?? defaultMonthData(year, month);
     const nextAssets = (base.assets || []).map((a) =>
-      a.id === assetId
-        ? { ...a, ...patch, lastUpdate: new Date().toISOString().slice(0, 10) }
-        : a
+      a.id === assetId ? { ...a, ...patch, lastUpdate: new Date().toISOString().slice(0, 10) } : a
     );
     saveData({ ...base, assets: nextAssets });
   }
 
-  /**
-   * Apaga uma linha de asset da lista de todas.
-   *
-   * @param {*} assetId Id (PK do banco de dados) do asset a ser removido.
-   */
   function handleRemoveAsset(assetId) {
     const base = data ?? defaultMonthData(year, month);
     const nextAssets = (base.assets || []).filter((a) => a.id !== assetId);
     saveData({ ...base, assets: nextAssets });
   }
 
-  /**
-   * Insere uma nova linha de extrato para a lista de todas, que ocorre ao clicar em
-   * "Adicionar" em StatementTable. Isso não tem relação na tabela de importar um
-   * arquivo externo.
-   *
-   * @param {Object} newStatement Dados que se encaixam no banco desse novo extrato.
-   */
   function handleAddStatementRow(newStatement) {
     const base = data ?? defaultMonthData(year, month);
-    const next = {
+    saveData({
       ...base,
       statement: [...(base.statement || []), newStatement],
-    };
-    saveData(next);
+    });
   }
 
-  /**
-   * Alterar dados de uma linha específica de um extrato. Essa função é usada dentro
-   * do StatementTable que imprime a tabela de dados, e o usuário pode editar diretamente
-   * na linha.
-   *
-   * @param {*} statementId Id (PK do banco de dados) do extrato a ser modificado.
-   * @param {Object} patch Objeto com as chaves que sofreram alterações (espera-se apenas uma).
-   */
   function handleUpdateStatementRow(statementId, patch) {
     const base = data ?? defaultMonthData(year, month);
     const nextStatement = (base.statement || []).map((r) =>
-      r.id === statementId
-        ? { ...r, ...patch, lastUpdate: new Date().toISOString().slice(0, 10) }
-        : r
+      r.id === statementId ? { ...r, ...patch, lastUpdate: new Date().toISOString().slice(0, 10) } : r
     );
     saveData({ ...base, statement: nextStatement });
   }
 
-  /**
-   * Apaga uma linha de extrato da lista de todas.
-   *
-   * @param {*} statementId Id (PK do banco de dados) do extrato.
-   */
   function handleRemoveStatementRow(statementId) {
     const base = data ?? defaultMonthData(year, month);
     const nextStatement = (base.statement || []).filter((r) => r.id !== statementId);
     saveData({ ...base, statement: nextStatement });
   }
 
-  /**
-   * Salva todas as linhas importadas para o extrato de um arquivo no banco de dados
-   * com os demais extratos já inseridos. Função chamada no onSubmit do RHF apenas
-   * quando todas as linhas estão validadas.
-   *
-   * @param {Object[]} fixedImportedStatement Linhas de extrato importadas e validadas.
-   */
   function handleSaveStatementRows(fixedImportedStatement) {
     const base = data ?? defaultMonthData(year, month);
     const current = base.statement || [];
@@ -227,111 +286,205 @@ export default function Dashboard() {
     saveData({ ...base, statement: nextData });
   }
 
-  /**
-   * Atualiza o estado do dashboard toda vez que o MonthPicker for atualizado.
-   * @param {Object} param Ano e mês selecionado no componente externo.
-   */
   function onChangeMonth({ year: y, month: m }) {
     setYear(y);
     setMonth(m);
   }
 
+  async function handleCreateMonthFromOverview({ year: targetYear, month: targetMonth, copyFrom }) {
+    const exists = await financeApi.monthsGet({ year: targetYear, month: targetMonth });
+    if (exists) {
+      throw new Error(`O mes ${monthKey(targetYear, targetMonth)} ja existe.`);
+    }
+
+    if (!copyFrom) {
+      const empty = defaultMonthData(targetYear, targetMonth);
+      await financeApi.monthsUpsert({ year: targetYear, month: targetMonth, data: empty });
+      await loadMonthsOverview();
+      return;
+    }
+
+    const [copyYearRaw, copyMonthRaw] = String(copyFrom).split("-");
+    const copyYear = Number(copyYearRaw);
+    const copyMonth = Number(copyMonthRaw);
+    const baseMonth = await financeApi.monthsGet({ year: copyYear, month: copyMonth });
+
+    if (!baseMonth?.data) {
+      throw new Error("Nao foi possivel carregar o mes base selecionado.");
+    }
+
+    const cloned = JSON.parse(JSON.stringify(baseMonth.data));
+    cloned.month = monthKey(targetYear, targetMonth);
+    cloned.meta = {
+      ...(cloned.meta || {}),
+      copiedFrom: monthKey(copyYear, copyMonth),
+    };
+
+    await financeApi.monthsUpsert({
+      year: targetYear,
+      month: targetMonth,
+      data: computeTotals(cloned),
+    });
+    await loadMonthsOverview();
+  }
+
+  const summaryByInstitution = Object.entries(summaryData?.totalByInstitution || {});
+  const summaryByType = Object.entries(summaryData?.totalByType || {});
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <MonthPicker
-        year={year}
-        month={month}
-        onChange={onChangeMonth}
-        onCreateEmpty={handleCreateEmpty}
-        onCopyFromPrevious={handleCopyFromPrevious}
-        onDelete={handleDelete}
-      />
-
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        <div style={{ padding: 12, border: "1px solid #3333", borderRadius: 8 }}>
-          <div style={{ opacity: 0.8, fontSize: 12 }}>Mês</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{selectedMonth}</div>
-        </div>
-
-        <div style={{ padding: 12, border: "1px solid #3333", borderRadius: 8 }}>
-          <div style={{ opacity: 0.8, fontSize: 12 }}>Patrimônio total</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>
-            {netWorth.toLocaleString("pt-BR", {
-              style: "currency",
-              currency: "BRL",
-            })}
-          </div>
-        </div>
-      </div>
-
-      {!setMonthData && (
-        <div style={{ padding: 12, border: "1px dashed #3336", borderRadius: 8 }}>
-          <p style={{ margin: 0 }}>
-            Esse mês ainda não foi criado. Você pode <b>criar vazio</b> ou{" "}
-            <b>copiar do mês anterior</b>.
-          </p>
-        </div>
-      )}
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => setTab("summary")}>Resumo mensal</button>
-        <button onClick={() => setTab("user-amount")}>Saldo patrimonial</button>
-        <button onClick={() => setTab("statement")}>Extrato</button>
-        <button onClick={() => setTab("notes")}>Notas</button>
-      </div>
-
-      <Page id="summary" active={tab} title="Resumo do mês">
-        <pre style={{ background: "#f6f6f6", padding: 12, borderRadius: 8 }}>
-          {JSON.stringify(summaryData, null, 2)}
-        </pre>
-      </Page>
-
-      <Page id="user-amount" active={tab} title="Ativos do mês">
-        <AssetEditor onAdd={handleAddAsset} />
-        <AssetsTable
-          assets={assets}
-          onUpdateAsset={handleUpdateAsset}
-          onRemoveAsset={handleRemoveAsset}
+    <AppShell
+      title="Patrimonio mensal"
+      subtitle="Aplicacao offline Electron"
+      menu={APP_MENU}
+      activeKey={page}
+      onNavigate={setPage}
+    >
+      <Stack gap={1.5}>
+        <MonthPicker
+          year={year}
+          month={month}
+          onChange={onChangeMonth}
+          onCreateEmpty={handleCreateEmpty}
+          onCopyFromPrevious={handleCopyFromPrevious}
+          onDelete={handleDelete}
+          disabled={savingLoading}
         />
-      </Page>
 
-      <Page id="statement" active={tab} title="Histórico do extrato mensal">
-        <StatementImporter onImport={handleSaveStatementRows} />
-        <StatementTable
-          rows={statement}
-          onAddRow={handleAddStatementRow}
-          onUpdateRow={handleUpdateStatementRow}
-          onRemoveRow={handleRemoveStatementRow}
-        />
-      </Page>
+        {savingLoading && (
+          <Alert severity="info" icon={<CircularProgress size={16} />}>
+            Salvando alteracoes...
+          </Alert>
+        )}
 
-      <Page id="notes" active={tab} title="Notas do mês">
-        <textarea
-          rows={4}
-          style={{ width: "100%", padding: 10 }}
-          value={data?.meta?.notes || ""}
-          onChange={(e) => {
-            const base = data ?? defaultMonthData(year, month);
-            const next = {
-              ...base,
-              meta: { ...(base.meta || {}), notes: e.target.value },
-            };
-            saveData(next);
-          }}
-          placeholder="Ex: mudanças na carteira, observações..."
-        />
-      </Page>
+        {!loading && !monthData && (
+          <Alert severity="warning">
+            Esse mes ainda nao foi criado.
+          </Alert>
+        )}
 
-      {monthData && (
-        <span>Última modificação: {ISODateToBR(monthData.updated_at)}</span>
-      )}
-    </div>
+        <Stack direction={{ xs: "column", md: "row" }} gap={1.3} flexWrap="wrap">
+          <Grow in timeout={300}>
+            <Box sx={{ flex: "1 1 240px" }}>
+              <MetricCard
+                label="Periodo"
+                title="Mes selecionado"
+                value={selectedMonth}
+                color="info.main"
+                icon={<CalendarMonthRoundedIcon fontSize="small" />}
+              />
+            </Box>
+          </Grow>
+          <Grow in timeout={360}>
+            <Box sx={{ flex: "1 1 240px" }}>
+              <MetricCard
+                label="Consolidado"
+                title="Patrimonio do mes"
+                value={numberToCurrencyBR(netWorth)}
+                color="success.main"
+                icon={<SavingsRoundedIcon fontSize="small" />}
+              />
+            </Box>
+          </Grow>
+          <Grow in timeout={420}>
+            <Box sx={{ flex: "1 1 240px" }}>
+              <MetricCard
+                label="Composicao"
+                title="Ativos cadastrados"
+                value={String(assets.length)}
+                color="secondary.main"
+                icon={<AccountBalanceRoundedIcon fontSize="small" />}
+              />
+            </Box>
+          </Grow>
+          <Grow in timeout={480}>
+            <Box sx={{ flex: "1 1 240px" }}>
+              <MetricCard
+                label="Movimentacao"
+                title="Saldo do extrato"
+                value={numberToCurrencyBR(totalStatement)}
+                color="primary.main"
+                icon={<TimelineRoundedIcon fontSize="small" />}
+              />
+            </Box>
+          </Grow>
+        </Stack>
+
+        <Slide direction="up" in timeout={320} mountOnEnter unmountOnExit key={page}>
+          <Box>
+            {page === "dashboard" && (
+              <Stack gap={1.4}>
+                <AssetEditor onAdd={handleAddAsset} />
+                <AssetsTable
+                  assets={assets}
+                  onUpdateAsset={handleUpdateAsset}
+                  onRemoveAsset={handleRemoveAsset}
+                />
+                <Stack direction={{ xs: "column", md: "row" }} gap={1.3}>
+                  <Box sx={{ flex: 1 }}>
+                    <BreakdownCard title="Total por instituicao" rows={summaryByInstitution} />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <BreakdownCard title="Total por tipo de ativo" rows={summaryByType} />
+                  </Box>
+                </Stack>
+              </Stack>
+            )}
+
+            {page === "historico" && (
+              <Stack gap={1.4}>
+                <StatementImporter onImport={handleSaveStatementRows} />
+                <StatementTable
+                  rows={statement}
+                  onAddRow={handleAddStatementRow}
+                  onUpdateRow={handleUpdateStatementRow}
+                  onRemoveRow={handleRemoveStatementRow}
+                />
+              </Stack>
+            )}
+
+            {page === "faturas" && <InvoicesPanel rows={statement} />}
+
+            {page === "notas" && (
+              <Paper sx={{ p: 2, borderRadius: 3 }}>
+                <Typography variant="subtitle1" mb={1.2}>
+                  Notas do mes
+                </Typography>
+                <TextField
+                  multiline
+                  minRows={5}
+                  fullWidth
+                  value={data?.meta?.notes || ""}
+                  onChange={(e) => {
+                    const base = data ?? defaultMonthData(year, month);
+                    const next = {
+                      ...base,
+                      meta: { ...(base.meta || {}), notes: e.target.value },
+                    };
+                    saveData(next);
+                  }}
+                  placeholder="Ex: mudancas na carteira, observacoes..."
+                />
+              </Paper>
+            )}
+
+            {page === "meses" && (
+              <MonthsOverview
+                rows={monthsOverviewRows}
+                loading={monthsOverviewLoading}
+                onCreateMonth={handleCreateMonthFromOverview}
+              />
+            )}
+          </Box>
+        </Slide>
+
+        {(loading || monthData) && (
+          <Typography color="text.secondary" fontSize={13}>
+            {loading
+              ? "Atualizando dados do mes..."
+              : `Ultima modificacao: ${ISODateToBR(monthData?.updated_at)}`}
+          </Typography>
+        )}
+      </Stack>
+    </AppShell>
   );
 }

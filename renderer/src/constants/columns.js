@@ -1,6 +1,6 @@
 export const ASSETS_DEFAULT_COLUMNS = {
   name: "",
-  type: "cash",
+  type: "Saldo",
   institution: "",
   total: "",
 };

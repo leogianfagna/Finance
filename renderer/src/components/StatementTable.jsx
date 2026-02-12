@@ -1,14 +1,22 @@
 import { useMemo, useState } from "react";
-
-function toBRL(n) {
-  const v = Number(n) || 0;
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
+import {
+  Alert,
+  Button,
+  IconButton,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import FinanceDataGrid from "./common/FinanceDataGrid.jsx";
+import { numberToCurrencyBR } from "/src/utils/formatter.js";
 
 function parseBRNumber(s) {
   if (typeof s === "number") return s;
   if (!s) return 0;
-  // aceita "1.234,56" e "1234.56"
   const cleaned = String(s).trim().replace(/\./g, "").replace(",", ".");
   const v = Number(cleaned);
   return Number.isFinite(v) ? v : 0;
@@ -30,12 +38,7 @@ function calculateSummary(data) {
   return { in: worthIn, out: worthOut, total: worthOut + worthIn };
 }
 
-export default function StatementTable({
-  rows,
-  onAddRow,
-  onUpdateRow,
-  onRemoveRow,
-}) {
+export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRow }) {
   const [draft, setDraft] = useState({
     date: "",
     description: "",
@@ -46,12 +49,125 @@ export default function StatementTable({
   });
 
   const sorted = useMemo(() => {
-    return [...(rows || [])].sort((a, b) =>
-      String(a.date || "").localeCompare(String(b.date || ""))
-    );
+    return [...(rows || [])].sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
   }, [rows]);
 
-  const statitics = useMemo(() => calculateSummary(sorted), [sorted]);
+  const statistics = useMemo(() => calculateSummary(sorted), [sorted]);
+
+  const columns = useMemo(
+    () => [
+      {
+        field: "date",
+        headerName: "Data",
+        minWidth: 140,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            type="date"
+            value={params.row.date || ""}
+            onChange={(e) => onUpdateRow?.(params.row.id, { date: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "description",
+        headerName: "Descricao",
+        minWidth: 240,
+        flex: 1.2,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            value={params.row.description || ""}
+            onChange={(e) => onUpdateRow?.(params.row.id, { description: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "type",
+        headerName: "Tipo",
+        minWidth: 130,
+        renderCell: (params) => (
+          <TextField
+            select
+            size="small"
+            fullWidth
+            value={params.row.type || "debit"}
+            onChange={(e) => onUpdateRow?.(params.row.id, { type: e.target.value })}
+          >
+            <MenuItem value="debit">Debito</MenuItem>
+            <MenuItem value="credit">Credito</MenuItem>
+          </TextField>
+        ),
+      },
+      {
+        field: "amount",
+        headerName: "Valor",
+        minWidth: 140,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            inputMode="decimal"
+            value={String(params.row.amount ?? "")}
+            onChange={(e) =>
+              onUpdateRow?.(params.row.id, {
+                amount: parseBRNumber(e.target.value),
+              })
+            }
+          />
+        ),
+      },
+      {
+        field: "category",
+        headerName: "Categoria",
+        minWidth: 150,
+        flex: 0.8,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            value={params.row.category || ""}
+            onChange={(e) => onUpdateRow?.(params.row.id, { category: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "account",
+        headerName: "Conta",
+        minWidth: 150,
+        flex: 0.8,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            value={params.row.account || ""}
+            onChange={(e) => onUpdateRow?.(params.row.id, { account: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "actions",
+        headerName: "Acoes",
+        minWidth: 90,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: (params) => (
+          <IconButton
+            color="error"
+            onClick={() => {
+              if (!confirm("Remover esse lancamento?")) return;
+              onRemoveRow?.(params.row.id);
+            }}
+          >
+            <DeleteRoundedIcon />
+          </IconButton>
+        ),
+      },
+    ],
+    [onRemoveRow, onUpdateRow]
+  );
 
   function handleAdd() {
     const amount = parseBRNumber(draft.amount);
@@ -80,195 +196,80 @@ export default function StatementTable({
   }
 
   return (
-    <>
-      <div
-        style={{
-          border: "1px solid #3333",
-          borderRadius: 10,
-          padding: 12,
-          marginTop: "1rem",
-        }}
-      >
-        {/* Add row */}
-        <div
-          style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, opacity: 0.8 }}>Data</label>
-            <input
-              type="date"
-              value={draft.date}
-              onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-            />
-          </div>
+    <Stack gap={1.4}>
+      <Paper sx={{ p: 2, borderRadius: 2 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.2}>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <ReceiptLongRoundedIcon color="primary" />
+            <Typography variant="subtitle1">Novo lancamento</Typography>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Preencha os campos e adicione ao extrato
+          </Typography>
+        </Stack>
 
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-              minWidth: 220,
-            }}
+        <Stack direction={{ xs: "column", md: "row" }} gap={1.1}>
+          <TextField
+            size="small"
+            type="date"
+            label="Data"
+            InputLabelProps={{ shrink: true }}
+            value={draft.date}
+            onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
+          />
+          <TextField
+            size="small"
+            label="Descricao"
+            value={draft.description}
+            onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+            sx={{ minWidth: 220 }}
+          />
+          <TextField
+            select
+            size="small"
+            label="Tipo"
+            value={draft.type}
+            onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
+            sx={{ minWidth: 120 }}
           >
-            <label style={{ fontSize: 12, opacity: 0.8 }}>Descrição</label>
-            <input
-              value={draft.description}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, description: e.target.value }))
-              }
-              placeholder="Ex: Mercado / Uber / Salário"
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, opacity: 0.8 }}>Tipo</label>
-            <select
-              value={draft.type}
-              onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
-            >
-              <option value="debit">Débito</option>
-              <option value="credit">Crédito</option>
-            </select>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, opacity: 0.8 }}>Valor</label>
-            <input
-              value={draft.amount}
-              onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
-              placeholder="Ex: 123,45"
-              inputMode="decimal"
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, opacity: 0.8 }}>Categoria</label>
-            <input
-              value={draft.category}
-              onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
-              placeholder="Ex: Alimentação"
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, opacity: 0.8 }}>Conta</label>
-            <input
-              value={draft.account}
-              onChange={(e) => setDraft((d) => ({ ...d, account: e.target.value }))}
-              placeholder="Ex: Nubank"
-            />
-          </div>
-
-          <button onClick={handleAdd} style={{ padding: "6px 10px" }}>
+            <MenuItem value="debit">Debito</MenuItem>
+            <MenuItem value="credit">Credito</MenuItem>
+          </TextField>
+          <TextField
+            size="small"
+            label="Valor"
+            value={draft.amount}
+            onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
+            inputMode="decimal"
+          />
+          <TextField
+            size="small"
+            label="Categoria"
+            value={draft.category}
+            onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
+          />
+          <TextField
+            size="small"
+            label="Conta"
+            value={draft.account}
+            onChange={(e) => setDraft((d) => ({ ...d, account: e.target.value }))}
+          />
+          <Button variant="contained" onClick={handleAdd}>
             Adicionar
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Paper>
 
-      <div style={{ marginTop: 10, opacity: 0.85, fontSize: 13 }}>
-        Entrada: {toBRL(statitics.in)} | Saída: {toBRL(statitics.out)}
-      </div>
+      <Stack direction={{ xs: "column", md: "row" }} gap={1}>
+        <Alert severity="success" variant="outlined" sx={{ flex: 1 }}>
+          Entradas: <b>{numberToCurrencyBR(statistics.in)}</b>
+        </Alert>
+        <Alert severity="warning" variant="outlined" sx={{ flex: 1 }}>
+          Saidas: <b>{numberToCurrencyBR(statistics.out)}</b>
+        </Alert>
+      </Stack>
 
-      {/* Table */}
-      <div style={{ marginTop: 10, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #3333" }}>
-              <th style={{ padding: 8 }}>Data</th>
-              <th style={{ padding: 8 }}>Descrição</th>
-              <th style={{ padding: 8 }}>Tipo</th>
-              <th style={{ padding: 8 }}>Valor</th>
-              <th style={{ padding: 8 }}>Categoria</th>
-              <th style={{ padding: 8 }}>Conta</th>
-              <th style={{ padding: 8 }}>Ações</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {sorted.length === 0 ? (
-              <tr>
-                <td colSpan={8} style={{ padding: 10, opacity: 0.7 }}>
-                  Nenhum lançamento no extrato ainda.
-                </td>
-              </tr>
-            ) : (
-              sorted.map((r) => (
-                <tr key={r.id} style={{ borderBottom: "1px solid #3332" }}>
-                  <td style={{ padding: 8 }}>
-                    <input
-                      type="date"
-                      value={r.date || ""}
-                      onChange={(e) => onUpdateRow?.(r.id, { date: e.target.value })}
-                    />
-                  </td>
-
-                  <td style={{ padding: 8 }}>
-                    <input
-                      value={r.description || ""}
-                      onChange={(e) =>
-                        onUpdateRow?.(r.id, { description: e.target.value })
-                      }
-                      style={{ width: 260 }}
-                    />
-                  </td>
-
-                  <td style={{ padding: 8 }}>
-                    <select
-                      value={r.type || "debit"}
-                      onChange={(e) => onUpdateRow?.(r.id, { type: e.target.value })}
-                    >
-                      <option value="debit">Débito</option>
-                      <option value="credit">Crédito</option>
-                    </select>
-                  </td>
-
-                  <td style={{ padding: 8 }}>
-                    <input
-                      value={String(r.amount ?? "")}
-                      onChange={(e) =>
-                        onUpdateRow?.(r.id, {
-                          amount: parseBRNumber(e.target.value),
-                        })
-                      }
-                      style={{ width: 120 }}
-                      inputMode="decimal"
-                    />
-                  </td>
-
-                  <td style={{ padding: 8 }}>
-                    <input
-                      value={r.category || ""}
-                      onChange={(e) =>
-                        onUpdateRow?.(r.id, { category: e.target.value })
-                      }
-                    />
-                  </td>
-
-                  <td style={{ padding: 8 }}>
-                    <input
-                      value={r.account || ""}
-                      onChange={(e) =>
-                        onUpdateRow?.(r.id, { account: e.target.value })
-                      }
-                    />
-                  </td>
-
-                  <td style={{ padding: 8 }}>
-                    <button
-                      onClick={() => {
-                        if (!confirm("Remover esse lançamento?")) return;
-                        onRemoveRow?.(r.id);
-                      }}
-                    >
-                      Remover
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </>
+      <FinanceDataGrid rows={sorted} columns={columns} />
+    </Stack>
   );
 }
