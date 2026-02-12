@@ -20,6 +20,7 @@ import SpaceDashboardRoundedIcon from "@mui/icons-material/SpaceDashboardRounded
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import CalendarViewMonthRoundedIcon from "@mui/icons-material/CalendarViewMonthRounded";
 
 const drawerWidth = 260;
 
@@ -28,6 +29,7 @@ const menuIcons = {
   historico: <HistoryRoundedIcon />,
   faturas: <ReceiptLongRoundedIcon />,
   notas: <EditNoteRoundedIcon />,
+  meses: <CalendarViewMonthRoundedIcon />,
 };
 
 export default function AppShell({ title, subtitle, menu, activeKey, onNavigate, children }) {

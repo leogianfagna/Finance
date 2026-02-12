@@ -6,16 +6,12 @@ import {
   MenuItem,
   Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import FinanceDataGrid from "./common/FinanceDataGrid.jsx";
 import { numberToCurrencyBR } from "/src/utils/formatter.js";
 
 function parseBRNumber(s) {
@@ -58,6 +54,121 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
 
   const statistics = useMemo(() => calculateSummary(sorted), [sorted]);
 
+  const columns = useMemo(
+    () => [
+      {
+        field: "date",
+        headerName: "Data",
+        minWidth: 140,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            type="date"
+            value={params.row.date || ""}
+            onChange={(e) => onUpdateRow?.(params.row.id, { date: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "description",
+        headerName: "Descricao",
+        minWidth: 240,
+        flex: 1.2,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            value={params.row.description || ""}
+            onChange={(e) => onUpdateRow?.(params.row.id, { description: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "type",
+        headerName: "Tipo",
+        minWidth: 130,
+        renderCell: (params) => (
+          <TextField
+            select
+            size="small"
+            fullWidth
+            value={params.row.type || "debit"}
+            onChange={(e) => onUpdateRow?.(params.row.id, { type: e.target.value })}
+          >
+            <MenuItem value="debit">Debito</MenuItem>
+            <MenuItem value="credit">Credito</MenuItem>
+          </TextField>
+        ),
+      },
+      {
+        field: "amount",
+        headerName: "Valor",
+        minWidth: 140,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            inputMode="decimal"
+            value={String(params.row.amount ?? "")}
+            onChange={(e) =>
+              onUpdateRow?.(params.row.id, {
+                amount: parseBRNumber(e.target.value),
+              })
+            }
+          />
+        ),
+      },
+      {
+        field: "category",
+        headerName: "Categoria",
+        minWidth: 150,
+        flex: 0.8,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            value={params.row.category || ""}
+            onChange={(e) => onUpdateRow?.(params.row.id, { category: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "account",
+        headerName: "Conta",
+        minWidth: 150,
+        flex: 0.8,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            value={params.row.account || ""}
+            onChange={(e) => onUpdateRow?.(params.row.id, { account: e.target.value })}
+          />
+        ),
+      },
+      {
+        field: "actions",
+        headerName: "Acoes",
+        minWidth: 90,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: (params) => (
+          <IconButton
+            color="error"
+            onClick={() => {
+              if (!confirm("Remover esse lancamento?")) return;
+              onRemoveRow?.(params.row.id);
+            }}
+          >
+            <DeleteRoundedIcon />
+          </IconButton>
+        ),
+      },
+    ],
+    [onRemoveRow, onUpdateRow]
+  );
+
   function handleAdd() {
     const amount = parseBRNumber(draft.amount);
     if (!draft.date || !draft.description || !amount) return;
@@ -86,10 +197,17 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
 
   return (
     <Stack gap={1.4}>
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
-        <Typography variant="subtitle1" mb={1.2}>
-          Adicionar lancamento
-        </Typography>
+      <Paper sx={{ p: 2, borderRadius: 2 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.2}>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <ReceiptLongRoundedIcon color="primary" />
+            <Typography variant="subtitle1">Novo lancamento</Typography>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">
+            Preencha os campos e adicione ao extrato
+          </Typography>
+        </Stack>
+
         <Stack direction={{ xs: "column", md: "row" }} gap={1.1}>
           <TextField
             size="small"
@@ -104,7 +222,7 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
             label="Descricao"
             value={draft.description}
             onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-            sx={{ minWidth: 250 }}
+            sx={{ minWidth: 220 }}
           />
           <TextField
             select
@@ -151,101 +269,7 @@ export default function StatementTable({ rows, onAddRow, onUpdateRow, onRemoveRo
         </Alert>
       </Stack>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Data</TableCell>
-              <TableCell>Descricao</TableCell>
-              <TableCell>Tipo</TableCell>
-              <TableCell>Valor</TableCell>
-              <TableCell>Categoria</TableCell>
-              <TableCell>Conta</TableCell>
-              <TableCell align="right">Acoes</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {sorted.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7}>
-                  <Typography color="text.secondary">Nenhum lancamento no extrato ainda.</Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              sorted.map((r) => (
-                <TableRow key={r.id} hover>
-                  <TableCell>
-                    <TextField
-                      size="small"
-                      type="date"
-                      value={r.date || ""}
-                      onChange={(e) => onUpdateRow?.(r.id, { date: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <TextField
-                      size="small"
-                      value={r.description || ""}
-                      onChange={(e) => onUpdateRow?.(r.id, { description: e.target.value })}
-                      sx={{ minWidth: 240 }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <TextField
-                      select
-                      size="small"
-                      value={r.type || "debit"}
-                      onChange={(e) => onUpdateRow?.(r.id, { type: e.target.value })}
-                      sx={{ minWidth: 120 }}
-                    >
-                      <MenuItem value="debit">Debito</MenuItem>
-                      <MenuItem value="credit">Credito</MenuItem>
-                    </TextField>
-                  </TableCell>
-                  <TableCell>
-                    <TextField
-                      size="small"
-                      value={String(r.amount ?? "")}
-                      onChange={(e) =>
-                        onUpdateRow?.(r.id, {
-                          amount: parseBRNumber(e.target.value),
-                        })
-                      }
-                      sx={{ minWidth: 120 }}
-                      inputMode="decimal"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <TextField
-                      size="small"
-                      value={r.category || ""}
-                      onChange={(e) => onUpdateRow?.(r.id, { category: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <TextField
-                      size="small"
-                      value={r.account || ""}
-                      onChange={(e) => onUpdateRow?.(r.id, { account: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      color="error"
-                      onClick={() => {
-                        if (!confirm("Remover esse lancamento?")) return;
-                        onRemoveRow?.(r.id);
-                      }}
-                    >
-                      <DeleteRoundedIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <FinanceDataGrid rows={sorted} columns={columns} />
     </Stack>
   );
 }

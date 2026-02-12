@@ -11,12 +11,17 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
+import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
+import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
 import { financeApi } from "../api/financeApi.js";
 import MonthPicker from "../components/MonthPicker.jsx";
 import AssetEditor from "../components/AssetEditor.jsx";
 import AssetsTable from "../components/AssetsTable.jsx";
 import StatementImporter from "../components/StatmentImporter.jsx";
 import StatementTable from "../components/StatementTable.jsx";
+import MonthsOverview from "../components/MonthsOverview.jsx";
 import AppShell from "../components/layout/AppShell.jsx";
 import MetricCard from "../components/common/MetricCard.jsx";
 import { computeTotals, defaultMonthData, getNowYearMonth, monthKey } from "../utils/month.js";
@@ -28,11 +33,12 @@ const APP_MENU = [
   { key: "historico", label: "Historico" },
   { key: "faturas", label: "Faturas" },
   { key: "notas", label: "Notas" },
+  { key: "meses", label: "Meses" },
 ];
 
 function BreakdownCard({ title, rows }) {
   return (
-    <Paper sx={{ p: 2, borderRadius: 3, height: "100%" }}>
+    <Paper sx={{ p: 2, borderRadius: 2, height: "100%" }}>
       <Typography variant="subtitle1" mb={1.1}>
         {title}
       </Typography>
@@ -81,7 +87,7 @@ function InvoicesPanel({ rows }) {
                   p: 1.2,
                   border: "1px solid",
                   borderColor: "divider",
-                  borderRadius: 2,
+                  borderRadius: 1.5,
                 }}
               >
                 <Typography>{row.description || "Sem descricao"}</Typography>
@@ -105,6 +111,8 @@ export default function Dashboard() {
   const selectedMonth = useMemo(() => monthKey(year, month), [year, month]);
 
   const [monthData, setMonthData] = useState(null);
+  const [monthsOverviewRows, setMonthsOverviewRows] = useState([]);
+  const [monthsOverviewLoading, setMonthsOverviewLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingLoading, setSavingLoading] = useState(false);
   const [page, setPage] = useState("dashboard");
@@ -112,6 +120,7 @@ export default function Dashboard() {
   async function loadCurrentMonthData() {
     setLoading(true);
     try {
+      setMonthData(null);
       const row = await financeApi.monthsGet({ year, month });
       setMonthData(row);
     } finally {
@@ -119,8 +128,53 @@ export default function Dashboard() {
     }
   }
 
+  async function loadMonthsOverview() {
+    setMonthsOverviewLoading(true);
+    try {
+      const list = await financeApi.monthsList();
+      if (!Array.isArray(list) || list.length === 0) {
+        setMonthsOverviewRows([]);
+        return;
+      }
+
+      const detailList = await Promise.all(
+        list.map((item) => financeApi.monthsGet({ year: item.year, month: item.month }))
+      );
+
+      const rows = list.map((item, idx) => {
+        const detail = detailList[idx];
+        const detailsData = detail?.data || defaultMonthData(item.year, item.month);
+        const assets = detailsData.assets || [];
+        const statementRows = detailsData.statement || [];
+        const netWorth =
+          Number(detailsData?.totals?.netWorth) ||
+          assets.reduce((sum, asset) => sum + (Number(asset.total) || 0), 0);
+        const statementTotal = statementRows.reduce(
+          (sum, statement) => sum + (Number(statement.amount) || 0),
+          0
+        );
+
+        return {
+          id: item.id || `${item.year}-${item.month}`,
+          month: monthKey(item.year, item.month),
+          netWorth,
+          assetsCount: assets.length,
+          statementCount: statementRows.length,
+          statementTotal,
+          updatedAt: ISODateToBR(detail?.updated_at || item.updated_at),
+          hasData: detail != null,
+        };
+      });
+
+      setMonthsOverviewRows(rows);
+    } finally {
+      setMonthsOverviewLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadCurrentMonthData();
+    loadMonthsOverview();
   }, [year, month]);
 
   const data = useMemo(() => {
@@ -147,6 +201,7 @@ export default function Dashboard() {
       const fixedWithTotalBalance = computeTotals(nextData);
       await financeApi.monthsUpsert({ year, month, data: fixedWithTotalBalance });
       await loadCurrentMonthData();
+      await loadMonthsOverview();
     } finally {
       setSavingLoading(false);
     }
@@ -162,6 +217,7 @@ export default function Dashboard() {
     try {
       await financeApi.monthsCopyFromPrevious({ year, month });
       await loadCurrentMonthData();
+      await loadMonthsOverview();
     } finally {
       setSavingLoading(false);
     }
@@ -173,6 +229,7 @@ export default function Dashboard() {
     try {
       await financeApi.monthsDelete({ year, month });
       setMonthData(null);
+      await loadMonthsOverview();
     } finally {
       setSavingLoading(false);
     }
@@ -234,6 +291,43 @@ export default function Dashboard() {
     setMonth(m);
   }
 
+  async function handleCreateMonthFromOverview({ year: targetYear, month: targetMonth, copyFrom }) {
+    const exists = await financeApi.monthsGet({ year: targetYear, month: targetMonth });
+    if (exists) {
+      throw new Error(`O mes ${monthKey(targetYear, targetMonth)} ja existe.`);
+    }
+
+    if (!copyFrom) {
+      const empty = defaultMonthData(targetYear, targetMonth);
+      await financeApi.monthsUpsert({ year: targetYear, month: targetMonth, data: empty });
+      await loadMonthsOverview();
+      return;
+    }
+
+    const [copyYearRaw, copyMonthRaw] = String(copyFrom).split("-");
+    const copyYear = Number(copyYearRaw);
+    const copyMonth = Number(copyMonthRaw);
+    const baseMonth = await financeApi.monthsGet({ year: copyYear, month: copyMonth });
+
+    if (!baseMonth?.data) {
+      throw new Error("Nao foi possivel carregar o mes base selecionado.");
+    }
+
+    const cloned = JSON.parse(JSON.stringify(baseMonth.data));
+    cloned.month = monthKey(targetYear, targetMonth);
+    cloned.meta = {
+      ...(cloned.meta || {}),
+      copiedFrom: monthKey(copyYear, copyMonth),
+    };
+
+    await financeApi.monthsUpsert({
+      year: targetYear,
+      month: targetMonth,
+      data: computeTotals(cloned),
+    });
+    await loadMonthsOverview();
+  }
+
   const summaryByInstitution = Object.entries(summaryData?.totalByInstitution || {});
   const summaryByType = Object.entries(summaryData?.totalByType || {});
 
@@ -262,31 +356,55 @@ export default function Dashboard() {
           </Alert>
         )}
 
-        {!monthData && (
+        {!loading && !monthData && (
           <Alert severity="warning">
-            Esse mes ainda nao foi criado. Use "Criar mes vazio" ou "Copiar mes anterior".
+            Esse mes ainda nao foi criado.
           </Alert>
         )}
 
         <Stack direction={{ xs: "column", md: "row" }} gap={1.3} flexWrap="wrap">
           <Grow in timeout={300}>
             <Box sx={{ flex: "1 1 240px" }}>
-              <MetricCard label="Mes selecionado" value={selectedMonth} />
+              <MetricCard
+                label="Periodo"
+                title="Mes selecionado"
+                value={selectedMonth}
+                color="info.main"
+                icon={<CalendarMonthRoundedIcon fontSize="small" />}
+              />
             </Box>
           </Grow>
           <Grow in timeout={360}>
             <Box sx={{ flex: "1 1 240px" }}>
-              <MetricCard label="Patrimonio do mes" value={numberToCurrencyBR(netWorth)} />
+              <MetricCard
+                label="Consolidado"
+                title="Patrimonio do mes"
+                value={numberToCurrencyBR(netWorth)}
+                color="success.main"
+                icon={<SavingsRoundedIcon fontSize="small" />}
+              />
             </Box>
           </Grow>
           <Grow in timeout={420}>
             <Box sx={{ flex: "1 1 240px" }}>
-              <MetricCard label="Ativos cadastrados" value={String(assets.length)} accent="secondary.main" />
+              <MetricCard
+                label="Composicao"
+                title="Ativos cadastrados"
+                value={String(assets.length)}
+                color="secondary.main"
+                icon={<AccountBalanceRoundedIcon fontSize="small" />}
+              />
             </Box>
           </Grow>
           <Grow in timeout={480}>
             <Box sx={{ flex: "1 1 240px" }}>
-              <MetricCard label="Saldo do extrato" value={numberToCurrencyBR(totalStatement)} accent="success.main" />
+              <MetricCard
+                label="Movimentacao"
+                title="Saldo do extrato"
+                value={numberToCurrencyBR(totalStatement)}
+                color="primary.main"
+                icon={<TimelineRoundedIcon fontSize="small" />}
+              />
             </Box>
           </Grow>
         </Stack>
@@ -347,6 +465,14 @@ export default function Dashboard() {
                   placeholder="Ex: mudancas na carteira, observacoes..."
                 />
               </Paper>
+            )}
+
+            {page === "meses" && (
+              <MonthsOverview
+                rows={monthsOverviewRows}
+                loading={monthsOverviewLoading}
+                onCreateMonth={handleCreateMonthFromOverview}
+              />
             )}
           </Box>
         </Slide>

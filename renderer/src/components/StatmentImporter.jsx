@@ -1,23 +1,18 @@
 import { useMemo, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
 import {
   Alert,
-  Box,
   Button,
   MenuItem,
   Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import { numberToCurrencyBR } from "/src/utils/formatter.js";
 import { PAYMENT_CATEGORIES, INSTITUTIONS } from "/src/constants/constants";
+import FinanceDataGrid from "./common/FinanceDataGrid.jsx";
 
 function normalizeHeader(h) {
   return String(h || "")
@@ -95,7 +90,6 @@ function parseCSV(text) {
 
   const rawHeaders = splitCSVLine(lines[0]).map((h) => h.trim());
   const headers = rawHeaders.map(normalizeHeader);
-
   const idxData = headers.indexOf("data");
   const idxValor = headers.indexOf("valor");
   const idxDesc = headers.indexOf("descricao");
@@ -103,7 +97,6 @@ function parseCSV(text) {
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = splitCSVLine(lines[i]);
-
     const dataRaw = idxData >= 0 ? cols[idxData] : "";
     const valorRaw = idxValor >= 0 ? cols[idxValor] : "";
     const descRaw = idxDesc >= 0 ? cols[idxDesc] : "";
@@ -122,34 +115,28 @@ function parseCSV(text) {
   return rows;
 }
 
+function emptyRow() {
+  return {
+    id: crypto.randomUUID?.() || String(Date.now()),
+    date: "",
+    description: "",
+    category: "",
+    amount: 0,
+    account: "to-do",
+    type: "to-do",
+  };
+}
+
 export default function StatementImporter({ onImport }) {
   const [fileName, setFileName] = useState("");
-
-  const {
-    control,
-    register,
-    handleSubmit,
-    setValue,
-    formState: { errors },
-  } = useForm({
-    defaultValues: {
-      rows: [],
-      bank: INSTITUTIONS[0],
-      transfer_type: "debito",
-    },
-    mode: "onSubmit",
-  });
-
-  const { fields, append, remove, replace } = useFieldArray({
-    control,
-    name: "rows",
-    keyName: "keyId",
-  });
+  const [rows, setRows] = useState([]);
+  const [bank, setBank] = useState(INSTITUTIONS[0]);
+  const [transferType, setTransferType] = useState("debito");
 
   const totals = useMemo(() => {
     let entradas = 0;
     let saidas = 0;
-    for (const r of fields) {
+    for (const r of rows) {
       const v = Number(r.amount);
       if (Number.isFinite(v)) {
         if (v < 0) saidas += v;
@@ -157,7 +144,106 @@ export default function StatementImporter({ onImport }) {
       }
     }
     return { entradas, saidas };
-  }, [fields]);
+  }, [rows]);
+
+  const columns = useMemo(
+    () => [
+      {
+        field: "date",
+        headerName: "Data",
+        minWidth: 140,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            type="date"
+            value={params.row.date || ""}
+            onChange={(e) => {
+              const value = e.target.value;
+              setRows((prev) => prev.map((r) => (r.id === params.row.id ? { ...r, date: value } : r)));
+            }}
+          />
+        ),
+      },
+      {
+        field: "description",
+        headerName: "Descricao",
+        minWidth: 250,
+        flex: 1.2,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            fullWidth
+            value={params.row.description || ""}
+            onChange={(e) => {
+              const value = e.target.value;
+              setRows((prev) =>
+                prev.map((r) => (r.id === params.row.id ? { ...r, description: value } : r))
+              );
+            }}
+          />
+        ),
+      },
+      {
+        field: "category",
+        headerName: "Categoria",
+        minWidth: 180,
+        renderCell: (params) => (
+          <TextField
+            select
+            size="small"
+            fullWidth
+            value={params.row.category || ""}
+            onChange={(e) => {
+              const value = e.target.value;
+              setRows((prev) => prev.map((r) => (r.id === params.row.id ? { ...r, category: value } : r)));
+            }}
+          >
+            {PAYMENT_CATEGORIES.map((c) => (
+              <MenuItem key={c || "empty"} value={c}>
+                {c || "Selecione..."}
+              </MenuItem>
+            ))}
+          </TextField>
+        ),
+      },
+      {
+        field: "amount",
+        headerName: "Valor",
+        minWidth: 140,
+        renderCell: (params) => (
+          <TextField
+            size="small"
+            inputMode="decimal"
+            value={String(params.row.amount ?? "")}
+            onChange={(e) => {
+              const n = toNumberBR(e.target.value);
+              setRows((prev) =>
+                prev.map((r) => (r.id === params.row.id ? { ...r, amount: Number.isFinite(n) ? n : 0 } : r))
+              );
+            }}
+          />
+        ),
+      },
+      {
+        field: "actions",
+        headerName: "Acoes",
+        minWidth: 90,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: (params) => (
+          <Button
+            color="error"
+            startIcon={<DeleteRoundedIcon />}
+            onClick={() => setRows((prev) => prev.filter((r) => r.id !== params.row.id))}
+          >
+            Remover
+          </Button>
+        ),
+      },
+    ],
+    []
+  );
 
   async function handleFile(file) {
     if (!file) return;
@@ -166,7 +252,7 @@ export default function StatementImporter({ onImport }) {
 
     if (extension === "csv") {
       const fileInText = await file.text();
-      replace(parseCSV(fileInText));
+      setRows(parseCSV(fileInText));
       return;
     }
 
@@ -178,37 +264,30 @@ export default function StatementImporter({ onImport }) {
     alert("Formato nao suportado. Envie um CSV ou Excel.");
   }
 
-  function addRow() {
-    append({
-      id: crypto.randomUUID?.() || String(Date.now()),
-      date: "",
-      description: "",
-      category: "",
-      account: "to-do",
-      type: "to-do",
-      amount: 0,
-    });
+  function handleSave() {
+    const invalid = rows.some(
+      (row) => !row.date || !String(row.description || "").trim() || !Number.isFinite(Number(row.amount))
+    );
+    if (invalid) {
+      alert("Revise o importador: data, descricao e valor sao obrigatorios em todas as linhas.");
+      return;
+    }
+    onImport(rows.map((row) => ({ ...row, account: bank, type: transferType })));
   }
 
-  const onSave = (data) => {
-    onImport(data.rows);
-  };
-
   return (
-    <Paper sx={{ p: 2, borderRadius: 3 }}>
-      <Typography variant="subtitle1" mb={1.2}>
-        Importar historico
-      </Typography>
+    <Paper sx={{ p: 2, borderRadius: 2 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.2}>
+        <Typography variant="subtitle1">Importar historico</Typography>
+        <Typography variant="caption" color="text.secondary">
+          CSV com Data, Valor e Descricao
+        </Typography>
+      </Stack>
 
       <Stack direction={{ xs: "column", md: "row" }} gap={1} alignItems={{ md: "center" }}>
-        <Button component="label" variant="contained">
+        <Button component="label" variant="contained" startIcon={<UploadFileRoundedIcon />}>
           Escolher arquivo
-          <input
-            hidden
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            onChange={(e) => handleFile(e.target.files?.[0])}
-          />
+          <input hidden type="file" accept=".csv,.xlsx,.xls" onChange={(e) => handleFile(e.target.files?.[0])} />
         </Button>
         {fileName && (
           <Typography color="text.secondary">
@@ -218,7 +297,7 @@ export default function StatementImporter({ onImport }) {
         <Button
           variant="outlined"
           onClick={() => {
-            replace([]);
+            setRows([]);
             setFileName("");
           }}
         >
@@ -226,18 +305,18 @@ export default function StatementImporter({ onImport }) {
         </Button>
       </Stack>
 
-      <Stack direction={{ xs: "column", md: "row" }} gap={1.1} mt={1.6}>
+      <Stack direction={{ xs: "column", md: "row" }} gap={1.1} mt={1.4}>
         <TextField
           select
           label="Instituicao"
           size="small"
-          defaultValue={INSTITUTIONS[0]}
-          {...register("bank", { required: "Selecione uma instituicao" })}
+          value={bank}
+          onChange={(e) => setBank(e.target.value)}
           sx={{ minWidth: 200 }}
         >
-          {INSTITUTIONS.map((bank, i) => (
-            <MenuItem key={`${bank}-${i}`} value={bank}>
-              {bank}
+          {INSTITUTIONS.map((inst) => (
+            <MenuItem key={inst} value={inst}>
+              {inst}
             </MenuItem>
           ))}
         </TextField>
@@ -246,8 +325,8 @@ export default function StatementImporter({ onImport }) {
           select
           label="Tipo de pagamento"
           size="small"
-          defaultValue="debito"
-          {...register("transfer_type", { required: "Selecione um tipo" })}
+          value={transferType}
+          onChange={(e) => setTransferType(e.target.value)}
           sx={{ minWidth: 200 }}
         >
           <MenuItem value="debito">Debito</MenuItem>
@@ -255,108 +334,24 @@ export default function StatementImporter({ onImport }) {
         </TextField>
       </Stack>
 
-      {!fields.length ? (
+      {!rows.length ? (
         <Typography color="text.secondary" mt={2}>
           Nenhuma linha importada ainda.
         </Typography>
       ) : (
-        <Box component="form" onSubmit={handleSubmit(onSave)}>
-          <TableContainer sx={{ mt: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Data</TableCell>
-                  <TableCell>Descricao</TableCell>
-                  <TableCell>Categoria</TableCell>
-                  <TableCell>Valor</TableCell>
-                  <TableCell align="right">Acoes</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {fields.map((row, index) => (
-                  <TableRow key={row.keyId}>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        type="date"
-                        error={Boolean(errors?.rows?.[index]?.date)}
-                        helperText={errors?.rows?.[index]?.date?.message}
-                        {...register(`rows.${index}.date`, {
-                          required: "Obrigatorio",
-                        })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        sx={{ minWidth: 260 }}
-                        placeholder="Descricao"
-                        error={Boolean(errors?.rows?.[index]?.description)}
-                        helperText={errors?.rows?.[index]?.description?.message}
-                        {...register(`rows.${index}.description`, {
-                          required: "Obrigatorio",
-                          validate: (v) => v.trim().length > 0 || "Obrigatorio",
-                        })}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        select
-                        size="small"
-                        error={Boolean(errors?.rows?.[index]?.category)}
-                        helperText={errors?.rows?.[index]?.category?.message}
-                        defaultValue=""
-                        {...register(`rows.${index}.category`, {
-                          required: "Selecione uma categoria",
-                        })}
-                      >
-                        {PAYMENT_CATEGORIES.map((c) => (
-                          <MenuItem key={c || "empty"} value={c}>
-                            {c ? c : "Selecione..."}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        inputMode="decimal"
-                        error={Boolean(errors?.rows?.[index]?.amount)}
-                        helperText={errors?.rows?.[index]?.amount?.message}
-                        {...register(`rows.${index}.amount`, {
-                          required: "Obrigatorio",
-                          valueAsNumber: true,
-                          validate: (v) => Number.isFinite(v) || "Numero invalido",
-                        })}
-                        onChange={(e) => {
-                          const n = toNumberBR(e.target.value);
-                          setValue(`rows.${index}.amount`, Number.isFinite(n) ? n : 0, {
-                            shouldValidate: true,
-                          });
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button color="error" onClick={() => remove(index)}>
-                        Apagar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+        <Stack gap={1.2} mt={1.5}>
+          <FinanceDataGrid rows={rows} columns={columns} />
 
-          <Stack direction={{ xs: "column", md: "row" }} gap={1} mt={1.5}>
-            <Button type="button" variant="outlined" onClick={addRow}>
+          <Stack direction={{ xs: "column", md: "row" }} gap={1}>
+            <Button variant="outlined" onClick={() => setRows((prev) => prev.concat(emptyRow()))}>
               Adicionar linha
             </Button>
-            <Button type="submit" variant="contained">
+            <Button variant="contained" onClick={handleSave}>
               Salvar
             </Button>
           </Stack>
 
-          <Stack direction={{ xs: "column", md: "row" }} gap={1} mt={1.2}>
+          <Stack direction={{ xs: "column", md: "row" }} gap={1}>
             <Alert severity="success" variant="outlined" sx={{ flex: 1 }}>
               Entradas: <b>{numberToCurrencyBR(totals.entradas)}</b>
             </Alert>
@@ -364,7 +359,7 @@ export default function StatementImporter({ onImport }) {
               Saidas: <b>{numberToCurrencyBR(totals.saidas)}</b>
             </Alert>
           </Stack>
-        </Box>
+        </Stack>
       )}
     </Paper>
   );
