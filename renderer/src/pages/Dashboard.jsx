@@ -12,10 +12,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
-import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import WavingHandRoundedIcon from "@mui/icons-material/WavingHandRounded";
 import { financeApi } from "../api/financeApi.js";
 import MonthPicker from "../components/MonthPicker.jsx";
@@ -217,6 +217,53 @@ export default function Dashboard() {
     () => statement.reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
     [statement]
   );
+  const invoiceTotal = useMemo(
+    () =>
+      statement
+        .filter((item) => item.type === "credit" || item.category === "Pagamentos")
+        .reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
+    [statement]
+  );
+  const netWorthSeries = useMemo(() => {
+    const sorted = [...(monthsOverviewRows || [])]
+      .filter((row) => Number.isFinite(Number(row.netWorth)))
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    if (!sorted.length) return [0];
+    return sorted.map((row) => Number(row.netWorth) || 0);
+  }, [monthsOverviewRows]);
+  const totalStatementSeries = useMemo(() => {
+    const sorted = [...(monthsOverviewRows || [])]
+      .filter((row) => Number.isFinite(Number(row.statementTotal)))
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    if (!sorted.length) return [0];
+    return sorted.map((row) => Number(row.statementTotal) || 0);
+  }, [monthsOverviewRows]);
+  const assetsSeries = useMemo(() => {
+    const sorted = [...(monthsOverviewRows || [])]
+      .filter((row) => Number.isFinite(Number(row.assetsCount)))
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    if (!sorted.length) return [0];
+    return sorted.map((row) => Number(row.assetsCount) || 0);
+  }, [monthsOverviewRows]);
+  const previousMonthKey = useMemo(() => {
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    return monthKey(prevYear, prevMonth);
+  }, [year, month]);
+  const previousMonthNetWorth = useMemo(() => {
+    const prev = (monthsOverviewRows || []).find((row) => row.month === previousMonthKey);
+    return Number(prev?.netWorth) || 0;
+  }, [monthsOverviewRows, previousMonthKey]);
+  const netWorthEvolution = useMemo(() => {
+    const diff = netWorth - previousMonthNetWorth;
+    if (!previousMonthNetWorth && !netWorth) {
+      return { pct: 0, diff };
+    }
+    if (!previousMonthNetWorth) {
+      return { pct: 100, diff };
+    }
+    return { pct: (diff / Math.abs(previousMonthNetWorth)) * 100, diff };
+  }, [netWorth, previousMonthNetWorth]);
 
   async function saveData(nextData) {
     setSavingLoading(true);
@@ -435,44 +482,62 @@ export default function Dashboard() {
           <Grow in timeout={300}>
             <Box sx={{ flex: "1 1 240px" }}>
               <MetricCard
-                label="Periodo"
-                title="Mes selecionado"
-                value={selectedMonth}
-                color="info.main"
-                icon={<CalendarMonthRoundedIcon fontSize="small" />}
+                title="Patrimonio do mes"
+                value={numberToCurrencyBR(netWorth)}
+                icon={<SavingsRoundedIcon fontSize="small" />}
+                accent="#1d4ed8"
+                titleColor="#0d2f90"
+                background="linear-gradient(90deg, #d6e7fb 0%, #c2d8f2 100%)"
+                trendText={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(1)}%`}
+                trendColor={netWorthEvolution.pct >= 0 ? "#1d4ed8" : "#b3261e"}
+                series={netWorthSeries}
               />
             </Box>
           </Grow>
           <Grow in timeout={360}>
             <Box sx={{ flex: "1 1 240px" }}>
               <MetricCard
-                label="Consolidado"
-                title="Patrimonio do mes"
-                value={numberToCurrencyBR(netWorth)}
-                color="success.main"
-                icon={<SavingsRoundedIcon fontSize="small" />}
+                title="Ativos cadastrados"
+                value={String(assets.length)}
+                icon={<AccountBalanceRoundedIcon fontSize="small" />}
+                accent="#6d28d9"
+                titleColor="#47138e"
+                background="linear-gradient(90deg, #ead9ff 0%, #d8c0f0 100%)"
+                trendText={`${assets.length} itens`}
+                trendColor="#4c1d95"
+                series={assetsSeries}
               />
             </Box>
           </Grow>
           <Grow in timeout={420}>
             <Box sx={{ flex: "1 1 240px" }}>
               <MetricCard
-                label="Composicao"
-                title="Ativos cadastrados"
-                value={String(assets.length)}
-                color="secondary.main"
-                icon={<AccountBalanceRoundedIcon fontSize="small" />}
+                title="Valor da fatura"
+                value={numberToCurrencyBR(invoiceTotal)}
+                icon={<ReceiptLongRoundedIcon fontSize="small" />}
+                accent="#b06b00"
+                titleColor="#8e4e00"
+                background="linear-gradient(90deg, #f8efcc 0%, #efdfad 100%)"
+                trendText={`${totalStatement >= 0 ? "+" : ""}${numberToCurrencyBR(totalStatement)}`}
+                trendColor="#8f4f00"
+                series={totalStatementSeries}
               />
             </Box>
           </Grow>
           <Grow in timeout={480}>
             <Box sx={{ flex: "1 1 240px" }}>
               <MetricCard
-                label="Movimentacao"
-                title="Saldo do extrato"
-                value={numberToCurrencyBR(totalStatement)}
-                color="primary.main"
-                icon={<TimelineRoundedIcon fontSize="small" />}
+                title="Evolucao patrimonial"
+                value={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(2)}%`}
+                icon={<InsightsRoundedIcon fontSize="small" />}
+                accent="#b3261e"
+                titleColor="#8c1712"
+                background="linear-gradient(90deg, #ffe5db 0%, #f3d2c6 100%)"
+                trendText={`${netWorthEvolution.diff >= 0 ? "+" : ""}${numberToCurrencyBR(
+                  netWorthEvolution.diff
+                )}`}
+                trendColor={netWorthEvolution.diff >= 0 ? "#9a3412" : "#b3261e"}
+                series={netWorthSeries}
               />
             </Box>
           </Grow>

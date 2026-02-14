@@ -1,73 +1,107 @@
+import { cloneElement, isValidElement } from "react";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Box, Paper, Stack, Typography } from "@mui/material";
 
+function toPath(data = [], width = 120, height = 42, padding = 4) {
+  if (!Array.isArray(data) || data.length === 0) return "";
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const stepX = data.length > 1 ? (width - padding * 2) / (data.length - 1) : 0;
+
+  return data
+    .map((point, idx) => {
+      const x = padding + idx * stepX;
+      const normalized = (point - min) / range;
+      const y = height - padding - normalized * (height - padding * 2);
+      return `${idx === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
 export default function MetricCard({
-  label,
-  value,
   title,
+  value,
   icon,
-  color = "primary.main",
-  helper,
+  accent = "#335eea",
+  background = "linear-gradient(90deg, #dce9ff 0%, #c6def9 100%)",
+  trendText,
+  trendColor,
+  series = [],
+  titleColor,
 }) {
   const theme = useTheme();
+  const path = toPath(series);
+  const computedTitleColor = titleColor || alpha(accent, 0.96);
+  const renderedIcon = isValidElement(icon) ? cloneElement(icon, { sx: { fontSize: 28 } }) : icon;
 
   return (
     <Paper
       sx={{
-        p: 2.1,
-        borderRadius: 4,
-        border: "1px solid rgba(108, 123, 241, 0.18)",
+        p: 2.4,
+        borderRadius: 3.2,
+        border: `1px solid ${alpha(accent, 0.2)}`,
         position: "relative",
         overflow: "hidden",
-        background:
-          "linear-gradient(140deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 248, 255, 0.95) 60%, rgba(255, 245, 236, 0.92) 100%)",
+        minHeight: 174,
+        background,
+        boxShadow: "none",
       }}
     >
       <Box
         sx={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 5,
-          background: `linear-gradient(90deg, ${color} 0%, ${alpha(theme.palette.secondary.main, 0.65)} 100%)`,
+          inset: 0,
+          pointerEvents: "none",
+          backgroundImage: `radial-gradient(${alpha(accent, 0.22)} 1.15px, transparent 1.15px)`,
+          backgroundSize: "6px 6px",
+          opacity: 0.5,
+          maskImage: "radial-gradient(circle at 10% 18%, black 0%, transparent 55%)",
+          WebkitMaskImage: "radial-gradient(circle at 10% 18%, black 0%, transparent 55%)",
         }}
       />
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.2}>
-        <Box>
-          <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: "0.06em" }}>
-            {label}
-          </Typography>
-          {title && (
-            <Typography variant="body2" fontWeight={700}>
-              {title}
-            </Typography>
-          )}
-        </Box>
+
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2.2}>
         <Box
           sx={{
-            color,
-            width: 42,
-            height: 42,
-            borderRadius: 2.5,
+            width: 52,
+            height: 52,
+            borderRadius: 2.2,
             display: "grid",
             placeItems: "center",
-            border: "1px solid",
-            borderColor: alpha(theme.palette.primary.main, 0.24),
-            bgcolor: alpha(theme.palette.primary.main, 0.11),
+            color: accent,
+            bgcolor: alpha(theme.palette.common.white, 0.56),
+            border: `1px solid ${alpha(accent, 0.28)}`,
           }}
         >
-          {icon}
+          {renderedIcon}
         </Box>
+        {trendText ? (
+          <Typography variant="body2" fontWeight={800} sx={{ color: trendColor || accent }}>
+            {trendText}
+          </Typography>
+        ) : null}
       </Stack>
-      <Typography variant="h6" sx={{ color, lineHeight: 1.2 }}>
+
+      <Typography variant="body1" fontWeight={800} sx={{ color: computedTitleColor }}>
+        {title}
+      </Typography>
+      <Typography variant="h5" sx={{ color: computedTitleColor, lineHeight: 1.2, mt: 0.3 }}>
         {value}
       </Typography>
-      {helper && (
-        <Typography variant="caption" color="text.secondary">
-          {helper}
-        </Typography>
-      )}
+
+      <Box sx={{ mt: 1.4, display: "flex", justifyContent: "flex-end" }}>
+        <svg width="124" height="46" viewBox="0 0 124 46" fill="none" aria-hidden="true">
+          <path
+            d={path}
+            stroke={accent}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      </Box>
     </Paper>
   );
 }
