@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Avatar,
   Box,
   Chip,
   CircularProgress,
@@ -15,6 +16,7 @@ import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
 import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
+import WavingHandRoundedIcon from "@mui/icons-material/WavingHandRounded";
 import { financeApi } from "../api/financeApi.js";
 import MonthPicker from "../components/MonthPicker.jsx";
 import AssetEditor from "../components/AssetEditor.jsx";
@@ -38,7 +40,15 @@ const APP_MENU = [
 
 function BreakdownCard({ title, rows }) {
   return (
-    <Paper sx={{ p: 2, borderRadius: 2, height: "100%" }}>
+    <Paper
+      sx={{
+        p: 2,
+        borderRadius: 4,
+        height: "100%",
+        background:
+          "linear-gradient(150deg, rgba(255, 255, 255, 0.97) 0%, rgba(241, 245, 255, 0.94) 85%, rgba(255, 243, 231, 0.9) 100%)",
+      }}
+    >
       <Typography variant="subtitle1" mb={1.1}>
         {title}
       </Typography>
@@ -47,7 +57,12 @@ function BreakdownCard({ title, rows }) {
       ) : (
         <Stack gap={0.9}>
           {rows.map(([label, value]) => (
-            <Stack key={label} direction="row" justifyContent="space-between">
+            <Stack
+              key={label}
+              direction="row"
+              justifyContent="space-between"
+              sx={{ p: 1, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.65)" }}
+            >
               <Typography color="text.secondary">{label || "Nao informado"}</Typography>
               <Typography fontWeight={600}>{numberToCurrencyBR(value)}</Typography>
             </Stack>
@@ -67,10 +82,17 @@ function InvoicesPanel({ rows }) {
 
   return (
     <Stack gap={1.2}>
-      <Alert severity="info" variant="outlined">
+      <Alert severity="info" variant="filled" sx={{ borderRadius: 3 }}>
         Total de faturas identificadas: <b>{numberToCurrencyBR(total)}</b>
       </Alert>
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Paper
+        sx={{
+          p: 2,
+          borderRadius: 4,
+          background:
+            "linear-gradient(140deg, rgba(255,255,255,0.98) 0%, rgba(242,246,255,0.96) 60%, rgba(255,244,235,0.9) 100%)",
+        }}
+      >
         <Typography variant="subtitle1" mb={1}>
           Lancamentos de fatura ({invoices.length})
         </Typography>
@@ -86,8 +108,9 @@ function InvoicesPanel({ rows }) {
                 sx={{
                   p: 1.2,
                   border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 1.5,
+                  borderColor: "rgba(108, 123, 241, 0.2)",
+                  borderRadius: 2.5,
+                  bgcolor: "rgba(255,255,255,0.72)",
                 }}
               >
                 <Typography>{row.description || "Sem descricao"}</Typography>
@@ -338,12 +361,58 @@ export default function Dashboard() {
       menu={APP_MENU}
       activeKey={page}
       onNavigate={setPage}
+      periodSelector={{
+        year,
+        month,
+        onChange: onChangeMonth,
+        disabled: savingLoading,
+      }}
     >
       <Stack gap={1.5}>
+        <Paper
+          sx={{
+            p: { xs: 1.8, md: 2.2 },
+            borderRadius: 5,
+            position: "relative",
+            overflow: "hidden",
+            background:
+              "linear-gradient(120deg, rgba(228, 233, 255, 0.95) 0%, rgba(239, 242, 255, 0.95) 48%, rgba(255, 233, 210, 0.92) 100%)",
+          }}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              right: -30,
+              top: -42,
+              width: 160,
+              height: 160,
+              borderRadius: "50%",
+              background:
+                "radial-gradient(circle, rgba(255, 186, 126, 0.42) 0%, rgba(255, 186, 126, 0) 70%)",
+            }}
+          />
+          <Stack direction={{ xs: "column", md: "row" }} gap={1.2} justifyContent="space-between">
+            <Stack direction="row" spacing={1.2} alignItems="center">
+              <Avatar sx={{ bgcolor: "primary.main", width: 42, height: 42 }}>
+                <WavingHandRoundedIcon fontSize="small" />
+              </Avatar>
+              <Box>
+                <Typography variant="subtitle1" sx={{ lineHeight: 1.1 }}>
+                  Ola! Vamos cuidar do seu mes financeiro
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Painel amigavel com foco em organizacao e consistencia.
+                </Typography>
+              </Box>
+            </Stack>
+            <Stack direction="row" gap={0.8} flexWrap="wrap" alignItems="center">
+              <Chip label={`Periodo ${selectedMonth}`} color="primary" size="small" />
+              <Chip label={`${assets.length} ativos`} color="secondary" size="small" />
+            </Stack>
+          </Stack>
+        </Paper>
+
         <MonthPicker
-          year={year}
-          month={month}
-          onChange={onChangeMonth}
           onCreateEmpty={handleCreateEmpty}
           onCopyFromPrevious={handleCopyFromPrevious}
           onDelete={handleDelete}

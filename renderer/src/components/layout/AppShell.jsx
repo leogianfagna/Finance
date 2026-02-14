@@ -2,12 +2,17 @@ import { useMemo, useState } from "react";
 import {
   AppBar,
   Box,
+  Chip,
   Drawer,
+  FormControl,
   IconButton,
+  InputLabel,
   List,
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  MenuItem,
+  Select,
   Stack,
   Toolbar,
   Typography,
@@ -32,10 +37,24 @@ const menuIcons = {
   meses: <CalendarViewMonthRoundedIcon />,
 };
 
-export default function AppShell({ title, subtitle, menu, activeKey, onNavigate, children }) {
+export default function AppShell({
+  title,
+  subtitle,
+  menu,
+  activeKey,
+  onNavigate,
+  children,
+  periodSelector,
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
+  const currentYear = new Date().getFullYear();
+  const years = useMemo(
+    () => Array.from({ length: 8 }, (_, idx) => currentYear - 5 + idx),
+    [currentYear]
+  );
+  const months = useMemo(() => Array.from({ length: 12 }, (_, idx) => idx + 1), []);
 
   const current = useMemo(
     () => menu.find((item) => item.key === activeKey) || menu[0],
@@ -43,15 +62,76 @@ export default function AppShell({ title, subtitle, menu, activeKey, onNavigate,
   );
 
   const content = (
-    <Stack sx={{ height: "100%", p: 2, gap: 1.2 }}>
-      <Box sx={{ px: 1.3, py: 1.2 }}>
-        <Typography variant="subtitle2" color="text.secondary">
-          Financas
+    <Stack sx={{ height: "100%", p: 2, gap: 1.2, position: "relative", overflow: "hidden" }}>
+      <Box
+        sx={{
+          position: "absolute",
+          right: -30,
+          top: -35,
+          width: 130,
+          height: 130,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(255, 183, 120, 0.45) 0%, rgba(255, 183, 120, 0) 72%)",
+        }}
+      />
+      <Stack sx={{ px: 1.3, py: 1.2, zIndex: 1 }} gap={1}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ letterSpacing: "0.06em" }}>
+          FRIENDLY
         </Typography>
-        <Typography variant="h6">{title}</Typography>
-      </Box>
+        <Typography variant="caption" color="text.secondary">
+          Selecione o periodo
+        </Typography>
+        {periodSelector ? (
+          <Stack direction="row" gap={0.8}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Ano</InputLabel>
+              <Select
+                value={periodSelector.year}
+                label="Ano"
+                disabled={periodSelector.disabled}
+                onChange={(event) =>
+                  periodSelector.onChange({
+                    year: Number(event.target.value),
+                    month: periodSelector.month,
+                  })
+                }
+              >
+                {years.map((yearOption) => (
+                  <MenuItem key={yearOption} value={yearOption}>
+                    {yearOption}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Mes</InputLabel>
+              <Select
+                value={periodSelector.month}
+                label="Mes"
+                disabled={periodSelector.disabled}
+                onChange={(event) =>
+                  periodSelector.onChange({
+                    year: periodSelector.year,
+                    month: Number(event.target.value),
+                  })
+                }
+              >
+                {months.map((monthOption) => (
+                  <MenuItem key={monthOption} value={monthOption}>
+                    {String(monthOption).padStart(2, "0")}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
+        ) : (
+          <Typography variant="h6" sx={{ lineHeight: 1.1 }}>
+            {title}
+          </Typography>
+        )}
+      </Stack>
 
-      <List sx={{ p: 0 }}>
+      <List sx={{ p: 0, zIndex: 1 }}>
         {menu.map((item) => (
           <ListItemButton
             key={item.key}
@@ -61,11 +141,18 @@ export default function AppShell({ title, subtitle, menu, activeKey, onNavigate,
               setMobileOpen(false);
             }}
             sx={{
-              borderRadius: 2.5,
+              borderRadius: 3,
               mb: 0.8,
+              border: "1px solid transparent",
+              transition: "all 180ms ease",
+              "&:hover": {
+                borderColor: "divider",
+                bgcolor: "rgba(255, 255, 255, 0.75)",
+              },
               "&.Mui-selected": {
-                bgcolor: "rgba(15, 118, 110, 0.12)",
+                bgcolor: "rgba(87, 103, 232, 0.12)",
                 color: "primary.main",
+                borderColor: "rgba(87, 103, 232, 0.26)",
               },
             }}
           >
@@ -80,16 +167,15 @@ export default function AppShell({ title, subtitle, menu, activeKey, onNavigate,
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", position: "relative" }}>
       <AppBar
         position="fixed"
         color="transparent"
         elevation={0}
         sx={{
-          borderBottom: "1px solid",
-          borderColor: "divider",
-          backdropFilter: "blur(12px)",
-          bgcolor: "rgba(244, 247, 251, 0.88)",
+          borderBottom: "1px solid rgba(108, 123, 241, 0.2)",
+          backdropFilter: "blur(14px)",
+          bgcolor: "rgba(239, 243, 255, 0.78)",
           zIndex: (t) => t.zIndex.drawer + 1,
         }}
       >
@@ -99,14 +185,15 @@ export default function AppShell({ title, subtitle, menu, activeKey, onNavigate,
               <MenuRoundedIcon />
             </IconButton>
           )}
-          <Box>
+          <Stack direction="row" spacing={1.2} alignItems="center">
             <Typography variant="h6" lineHeight={1.15}>
               {current?.label || title}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {subtitle}
             </Typography>
-          </Box>
+            <Chip size="small" color="secondary" label="Friendly UI" sx={{ ml: 1 }} />
+          </Stack>
         </Toolbar>
       </AppBar>
 
@@ -120,9 +207,8 @@ export default function AppShell({ title, subtitle, menu, activeKey, onNavigate,
             "& .MuiDrawer-paper": {
               width: drawerWidth,
               boxSizing: "border-box",
-              borderRight: "1px solid",
-              borderColor: "divider",
-              bgcolor: "#f8fbff",
+              borderRight: "1px solid rgba(108, 123, 241, 0.2)",
+              bgcolor: "rgba(250, 251, 255, 0.95)",
             },
           }}
         >
@@ -141,7 +227,7 @@ export default function AppShell({ title, subtitle, menu, activeKey, onNavigate,
         }}
       >
         <Fade in key={activeKey} timeout={360}>
-          <Box>{children}</Box>
+          <Box sx={{ maxWidth: 1380, mx: "auto" }}>{children}</Box>
         </Fade>
       </Box>
     </Box>

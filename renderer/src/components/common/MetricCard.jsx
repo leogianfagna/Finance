@@ -14,12 +14,13 @@ export default function MetricCard({
   return (
     <Paper
       sx={{
-        p: 2,
-        borderRadius: 2,
-        border: "1px solid",
-        borderColor: alpha(theme.palette.text.primary, 0.08),
+        p: 2.1,
+        borderRadius: 4,
+        border: "1px solid rgba(108, 123, 241, 0.18)",
         position: "relative",
         overflow: "hidden",
+        background:
+          "linear-gradient(140deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 248, 255, 0.95) 60%, rgba(255, 245, 236, 0.92) 100%)",
       }}
     >
       <Box
@@ -28,8 +29,8 @@ export default function MetricCard({
           top: 0,
           left: 0,
           right: 0,
-          height: 4,
-          bgcolor: color,
+          height: 5,
+          background: `linear-gradient(90deg, ${color} 0%, ${alpha(theme.palette.secondary.main, 0.65)} 100%)`,
         }}
       />
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.2}>
@@ -38,7 +39,7 @@ export default function MetricCard({
             {label}
           </Typography>
           {title && (
-            <Typography variant="body2" fontWeight={600}>
+            <Typography variant="body2" fontWeight={700}>
               {title}
             </Typography>
           )}
@@ -46,12 +47,14 @@ export default function MetricCard({
         <Box
           sx={{
             color,
-            width: 36,
-            height: 36,
-            borderRadius: 1.5,
+            width: 42,
+            height: 42,
+            borderRadius: 2.5,
             display: "grid",
             placeItems: "center",
-            bgcolor: alpha(theme.palette.primary.main, 0.09),
+            border: "1px solid",
+            borderColor: alpha(theme.palette.primary.main, 0.24),
+            bgcolor: alpha(theme.palette.primary.main, 0.11),
           }}
         >
           {icon}
