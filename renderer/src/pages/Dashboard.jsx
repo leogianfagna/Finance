@@ -27,7 +27,6 @@ import StatementTable from "../components/StatementTable.jsx";
 import MonthsOverview from "../components/MonthsOverview.jsx";
 import AppShell from "../components/layout/AppShell.jsx";
 import MetricCard from "../components/common/MetricCard.jsx";
-import AnalyticsDashboard from "../components/dashboard/AnalyticsDashboard.jsx";
 import ServicesPanel from "../components/services/ServicesPanel.jsx";
 import { computeTotals, defaultMonthData, getNowYearMonth, monthKey } from "../utils/month.js";
 import { generateMonthSummary } from "../utils/data.js";
@@ -46,7 +45,6 @@ const APP_MENU = [
     key: "registros",
     label: "Registros",
     items: [
-      { key: "dashboard", label: "Dashboard" },
       { key: "patrimonio", label: "Patrimonio" },
       { key: "servicos", label: "Servicos" },
       { key: "historico", label: "Historico" },
@@ -274,6 +272,11 @@ export default function Dashboard() {
         const assets = detailsData.assets || [];
         const statementRows = detailsData.statement || [];
         const servicesRows = detailsData.services || [];
+        const assetTypeTotals = assets.reduce((acc, asset) => {
+          const typeKey = String(asset.type || "Nao informado");
+          acc[typeKey] = (acc[typeKey] || 0) + (Number(asset.total) || 0);
+          return acc;
+        }, {});
         const netWorth =
           Number(detailsData?.totals?.netWorth) ||
           assets.reduce((sum, asset) => sum + (Number(asset.total) || 0), 0);
@@ -281,17 +284,63 @@ export default function Dashboard() {
           (sum, statement) => sum + (Number(statement.amount) || 0),
           0
         );
+        const statementIn = statementRows
+          .filter((statement) => Number(statement.amount) > 0)
+          .reduce((sum, statement) => sum + (Number(statement.amount) || 0), 0);
+        const statementOut = statementRows
+          .filter((statement) => Number(statement.amount) < 0)
+          .reduce((sum, statement) => sum + Math.abs(Number(statement.amount) || 0), 0);
+        const investmentTotal = assets
+          .filter((asset) => String(asset.type || "").toLowerCase().includes("invest"))
+          .reduce((sum, asset) => sum + (Number(asset.total) || 0), 0);
         const servicesPositiveCount = servicesRows.filter(
           (service) => Number(service.amount) > 0
         ).length;
+        const servicesPositiveTotal = servicesRows
+          .filter((service) => Number(service.amount) > 0)
+          .reduce((sum, service) => sum + (Number(service.amount) || 0), 0);
+        const expensesByCategory = statementRows
+          .filter((statement) => Number(statement.amount) < 0)
+          .reduce((acc, statement) => {
+            const key = String(statement.category || "Nao informado");
+            acc[key] = (acc[key] || 0) + Math.abs(Number(statement.amount) || 0);
+            return acc;
+          }, {});
+        const allocationByType = assets.reduce((acc, asset) => {
+          const key = String(asset.type || "Nao informado");
+          acc[key] = (acc[key] || 0) + (Number(asset.total) || 0);
+          return acc;
+        }, {});
+        const allocationByInstitution = assets.reduce((acc, asset) => {
+          const key = String(asset.institution || "Nao informado");
+          acc[key] = (acc[key] || 0) + (Number(asset.total) || 0);
+          return acc;
+        }, {});
 
         return {
           id: item.id || `${item.year}-${item.month}`,
           month: monthKey(item.year, item.month),
           netWorth,
           assetsCount: assets.length,
+          assetTypeTotals,
+          investmentTotal,
           servicesPositiveCount,
+          servicesPositiveTotal,
+          expensesByCategoryTop: Object.entries(expensesByCategory)
+            .sort((a, b) => Number(b[1]) - Number(a[1]))
+            .slice(0, 8)
+            .map(([label, value], idx) => ({ id: idx, label, value: Number(value) || 0 })),
+          allocationByTypeTop: Object.entries(allocationByType)
+            .sort((a, b) => Number(b[1]) - Number(a[1]))
+            .slice(0, 8)
+            .map(([label, value], idx) => ({ id: idx, label, value: Number(value) || 0 })),
+          allocationByInstitutionTop: Object.entries(allocationByInstitution)
+            .sort((a, b) => Number(b[1]) - Number(a[1]))
+            .slice(0, 8)
+            .map(([label, value], idx) => ({ id: idx, label, value: Number(value) || 0 })),
           statementCount: statementRows.length,
+          statementIn,
+          statementOut,
           statementTotal,
           updatedAt: ISODateToBR(detail?.updated_at || item.updated_at),
           hasData: detail != null,
@@ -514,7 +563,20 @@ export default function Dashboard() {
     if (!parsed) return;
     setYear(parsed.year);
     setMonth(parsed.month);
-    setPage("dashboard");
+    setPage("patrimonio");
+  }
+
+  async function handleDeleteMonthFromOverview(row) {
+    const parsed = parseMonthKey(row?.month);
+    if (!parsed) throw new Error("Mes invalido para exclusao.");
+    setSavingLoading(true);
+    try {
+      await financeApi.monthsDelete({ year: parsed.year, month: parsed.month });
+      await loadMonthsOverview();
+      await loadCurrentMonthData();
+    } finally {
+      setSavingLoading(false);
+    }
   }
 
   const summaryByInstitution = Object.entries(summaryData?.totalByInstitution || {});
@@ -524,7 +586,7 @@ export default function Dashboard() {
     [monthsOverviewRows, selectedMonth]
   );
   const monthRequiredPages = useMemo(
-    () => new Set(["dashboard", "patrimonio", "servicos", "historico", "faturas", "notas"]),
+    () => new Set(["patrimonio", "servicos", "historico", "faturas", "notas"]),
     []
   );
 
@@ -673,15 +735,6 @@ export default function Dashboard() {
 
           <Slide direction="up" in timeout={320} mountOnEnter unmountOnExit key={page}>
             <Box>
-              {page === "dashboard" && (
-                <AnalyticsDashboard
-                  monthsOverviewRows={monthsOverviewRows}
-                  assets={assets}
-                  statement={statement}
-                  selectedMonth={selectedMonth}
-                />
-              )}
-
               {page === "patrimonio" && (
                 <Stack gap={1.4}>
                   <AssetEditor onAdd={handleAddAsset} />
@@ -753,7 +806,9 @@ export default function Dashboard() {
                   rows={monthsOverviewRows}
                   loading={monthsOverviewLoading}
                   onCreateMonth={handleCreateMonthFromOverview}
+                  onDeleteMonth={handleDeleteMonthFromOverview}
                   onSelectMonth={handleOpenMonth}
+                  onOpenMonth={handleOpenMonth}
                 />
               )}
             </Box>
