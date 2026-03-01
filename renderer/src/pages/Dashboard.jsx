@@ -27,6 +27,7 @@ import StatementTable from "../components/StatementTable.jsx";
 import MonthsOverview from "../components/MonthsOverview.jsx";
 import AppShell from "../components/layout/AppShell.jsx";
 import MetricCard from "../components/common/MetricCard.jsx";
+import AnalyticsDashboard from "../components/dashboard/AnalyticsDashboard.jsx";
 import { computeTotals, defaultMonthData, getNowYearMonth, monthKey } from "../utils/month.js";
 import { generateMonthSummary } from "../utils/data.js";
 import { ISODateToBR, numberToCurrencyBR } from "/src/utils/formatter.js";
@@ -45,6 +46,7 @@ const APP_MENU = [
     label: "Registros",
     items: [
       { key: "dashboard", label: "Dashboard" },
+      { key: "patrimonio", label: "Patrimonio" },
       { key: "historico", label: "Historico" },
       { key: "faturas", label: "Faturas" },
       { key: "notas", label: "Notas" },
@@ -490,7 +492,7 @@ export default function Dashboard() {
     [monthsOverviewRows, selectedMonth]
   );
   const monthRequiredPages = useMemo(
-    () => new Set(["dashboard", "historico", "faturas", "notas"]),
+    () => new Set(["dashboard", "patrimonio", "historico", "faturas", "notas"]),
     []
   );
 
@@ -568,76 +570,87 @@ export default function Dashboard() {
                 </Alert>
               )}
 
-              <Stack direction={{ xs: "column", md: "row" }} gap={1.3} flexWrap="wrap">
-                <Grow in timeout={300}>
-                  <Box sx={{ flex: "1 1 240px" }}>
-                    <MetricCard
-                      title="Patrimonio do mes"
-                      value={numberToCurrencyBR(netWorth)}
-                      icon={<SavingsRoundedIcon fontSize="small" />}
-                      accent="#1d4ed8"
-                      titleColor="#0d2f90"
-                      background="linear-gradient(90deg, #d6e7fb 0%, #c2d8f2 100%)"
-                      trendText={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(1)}%`}
-                      trendColor={netWorthEvolution.pct >= 0 ? "#1d4ed8" : "#b3261e"}
-                      series={netWorthSeries}
-                    />
-                  </Box>
-                </Grow>
-                <Grow in timeout={360}>
-                  <Box sx={{ flex: "1 1 240px" }}>
-                    <MetricCard
-                      title="Ativos cadastrados"
-                      value={String(assets.length)}
-                      icon={<AccountBalanceRoundedIcon fontSize="small" />}
-                      accent="#6d28d9"
-                      titleColor="#47138e"
-                      background="linear-gradient(90deg, #ead9ff 0%, #d8c0f0 100%)"
-                      trendText={`${assets.length} itens`}
-                      trendColor="#4c1d95"
-                      series={assetsSeries}
-                    />
-                  </Box>
-                </Grow>
-                <Grow in timeout={420}>
-                  <Box sx={{ flex: "1 1 240px" }}>
-                    <MetricCard
-                      title="Valor da fatura"
-                      value={numberToCurrencyBR(invoiceTotal)}
-                      icon={<ReceiptLongRoundedIcon fontSize="small" />}
-                      accent="#b06b00"
-                      titleColor="#8e4e00"
-                      background="linear-gradient(90deg, #f8efcc 0%, #efdfad 100%)"
-                      trendText={`${totalStatement >= 0 ? "+" : ""}${numberToCurrencyBR(totalStatement)}`}
-                      trendColor="#8f4f00"
-                      series={totalStatementSeries}
-                    />
-                  </Box>
-                </Grow>
-                <Grow in timeout={480}>
-                  <Box sx={{ flex: "1 1 240px" }}>
-                    <MetricCard
-                      title="Evolucao patrimonial"
-                      value={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(2)}%`}
-                      icon={<InsightsRoundedIcon fontSize="small" />}
-                      accent="#b3261e"
-                      titleColor="#8c1712"
-                      background="linear-gradient(90deg, #ffe5db 0%, #f3d2c6 100%)"
-                      trendText={`${netWorthEvolution.diff >= 0 ? "+" : ""}${numberToCurrencyBR(
-                        netWorthEvolution.diff
-                      )}`}
-                      trendColor={netWorthEvolution.diff >= 0 ? "#9a3412" : "#b3261e"}
-                      series={netWorthSeries}
-                    />
-                  </Box>
-                </Grow>
-              </Stack>
+              {page === "patrimonio" && (
+                <Stack direction={{ xs: "column", md: "row" }} gap={1.3} flexWrap="wrap">
+                  <Grow in timeout={300}>
+                    <Box sx={{ flex: "1 1 240px" }}>
+                      <MetricCard
+                        title="Patrimonio do mes"
+                        value={numberToCurrencyBR(netWorth)}
+                        icon={<SavingsRoundedIcon fontSize="small" />}
+                        accent="#1d4ed8"
+                        titleColor="#0d2f90"
+                        background="linear-gradient(90deg, #d6e7fb 0%, #c2d8f2 100%)"
+                        trendText={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(1)}%`}
+                        trendColor={netWorthEvolution.pct >= 0 ? "#1d4ed8" : "#b3261e"}
+                        series={netWorthSeries}
+                      />
+                    </Box>
+                  </Grow>
+                  <Grow in timeout={360}>
+                    <Box sx={{ flex: "1 1 240px" }}>
+                      <MetricCard
+                        title="Ativos cadastrados"
+                        value={String(assets.length)}
+                        icon={<AccountBalanceRoundedIcon fontSize="small" />}
+                        accent="#6d28d9"
+                        titleColor="#47138e"
+                        background="linear-gradient(90deg, #ead9ff 0%, #d8c0f0 100%)"
+                        trendText={`${assets.length} itens`}
+                        trendColor="#4c1d95"
+                        series={assetsSeries}
+                      />
+                    </Box>
+                  </Grow>
+                  <Grow in timeout={420}>
+                    <Box sx={{ flex: "1 1 240px" }}>
+                      <MetricCard
+                        title="Valor da fatura"
+                        value={numberToCurrencyBR(invoiceTotal)}
+                        icon={<ReceiptLongRoundedIcon fontSize="small" />}
+                        accent="#b06b00"
+                        titleColor="#8e4e00"
+                        background="linear-gradient(90deg, #f8efcc 0%, #efdfad 100%)"
+                        trendText={`${totalStatement >= 0 ? "+" : ""}${numberToCurrencyBR(totalStatement)}`}
+                        trendColor="#8f4f00"
+                        series={totalStatementSeries}
+                      />
+                    </Box>
+                  </Grow>
+                  <Grow in timeout={480}>
+                    <Box sx={{ flex: "1 1 240px" }}>
+                      <MetricCard
+                        title="Evolucao patrimonial"
+                        value={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(2)}%`}
+                        icon={<InsightsRoundedIcon fontSize="small" />}
+                        accent="#b3261e"
+                        titleColor="#8c1712"
+                        background="linear-gradient(90deg, #ffe5db 0%, #f3d2c6 100%)"
+                        trendText={`${netWorthEvolution.diff >= 0 ? "+" : ""}${numberToCurrencyBR(
+                          netWorthEvolution.diff
+                        )}`}
+                        trendColor={netWorthEvolution.diff >= 0 ? "#9a3412" : "#b3261e"}
+                        series={netWorthSeries}
+                      />
+                    </Box>
+                  </Grow>
+                </Stack>
+              )}
             </>
           )}
 
           <Slide direction="up" in timeout={320} mountOnEnter unmountOnExit key={page}>
             <Box>
               {page === "dashboard" && (
+                <AnalyticsDashboard
+                  monthsOverviewRows={monthsOverviewRows}
+                  assets={assets}
+                  statement={statement}
+                  selectedMonth={selectedMonth}
+                />
+              )}
+
+              {page === "patrimonio" && (
                 <Stack gap={1.4}>
                   <AssetEditor onAdd={handleAddAsset} />
                   <AssetsTable

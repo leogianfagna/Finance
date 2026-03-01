@@ -25,6 +25,7 @@ import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import CalendarViewMonthRoundedIcon from "@mui/icons-material/CalendarViewMonthRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 
 const drawerWidth = 260;
 
@@ -35,6 +36,7 @@ const menuIcons = {
   meses: <CalendarViewMonthRoundedIcon />,
   configuracoes: <SettingsRoundedIcon />,
   dashboard: <SpaceDashboardRoundedIcon />,
+  patrimonio: <SavingsRoundedIcon />,
 };
 
 export default function AppShell({
