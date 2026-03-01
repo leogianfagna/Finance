@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Avatar,
   Box,
   Chip,
   CircularProgress,
@@ -11,10 +12,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
 import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
-import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import WavingHandRoundedIcon from "@mui/icons-material/WavingHandRounded";
 import { financeApi } from "../api/financeApi.js";
 import MonthPicker from "../components/MonthPicker.jsx";
 import AssetEditor from "../components/AssetEditor.jsx";
@@ -38,7 +40,15 @@ const APP_MENU = [
 
 function BreakdownCard({ title, rows }) {
   return (
-    <Paper sx={{ p: 2, borderRadius: 2, height: "100%" }}>
+    <Paper
+      sx={{
+        p: 2,
+        borderRadius: 4,
+        height: "100%",
+        background:
+          "linear-gradient(150deg, rgba(255, 255, 255, 0.97) 0%, rgba(241, 245, 255, 0.94) 85%, rgba(255, 243, 231, 0.9) 100%)",
+      }}
+    >
       <Typography variant="subtitle1" mb={1.1}>
         {title}
       </Typography>
@@ -47,7 +57,12 @@ function BreakdownCard({ title, rows }) {
       ) : (
         <Stack gap={0.9}>
           {rows.map(([label, value]) => (
-            <Stack key={label} direction="row" justifyContent="space-between">
+            <Stack
+              key={label}
+              direction="row"
+              justifyContent="space-between"
+              sx={{ p: 1, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.65)" }}
+            >
               <Typography color="text.secondary">{label || "Nao informado"}</Typography>
               <Typography fontWeight={600}>{numberToCurrencyBR(value)}</Typography>
             </Stack>
@@ -67,10 +82,17 @@ function InvoicesPanel({ rows }) {
 
   return (
     <Stack gap={1.2}>
-      <Alert severity="info" variant="outlined">
+      <Alert severity="info" variant="filled" sx={{ borderRadius: 3 }}>
         Total de faturas identificadas: <b>{numberToCurrencyBR(total)}</b>
       </Alert>
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Paper
+        sx={{
+          p: 2,
+          borderRadius: 4,
+          background:
+            "linear-gradient(140deg, rgba(255,255,255,0.98) 0%, rgba(242,246,255,0.96) 60%, rgba(255,244,235,0.9) 100%)",
+        }}
+      >
         <Typography variant="subtitle1" mb={1}>
           Lancamentos de fatura ({invoices.length})
         </Typography>
@@ -86,8 +108,9 @@ function InvoicesPanel({ rows }) {
                 sx={{
                   p: 1.2,
                   border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 1.5,
+                  borderColor: "rgba(108, 123, 241, 0.2)",
+                  borderRadius: 2.5,
+                  bgcolor: "rgba(255,255,255,0.72)",
                 }}
               >
                 <Typography>{row.description || "Sem descricao"}</Typography>
@@ -194,6 +217,53 @@ export default function Dashboard() {
     () => statement.reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
     [statement]
   );
+  const invoiceTotal = useMemo(
+    () =>
+      statement
+        .filter((item) => item.type === "credit" || item.category === "Pagamentos")
+        .reduce((sum, row) => sum + (Number(row.amount) || 0), 0),
+    [statement]
+  );
+  const netWorthSeries = useMemo(() => {
+    const sorted = [...(monthsOverviewRows || [])]
+      .filter((row) => Number.isFinite(Number(row.netWorth)))
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    if (!sorted.length) return [0];
+    return sorted.map((row) => Number(row.netWorth) || 0);
+  }, [monthsOverviewRows]);
+  const totalStatementSeries = useMemo(() => {
+    const sorted = [...(monthsOverviewRows || [])]
+      .filter((row) => Number.isFinite(Number(row.statementTotal)))
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    if (!sorted.length) return [0];
+    return sorted.map((row) => Number(row.statementTotal) || 0);
+  }, [monthsOverviewRows]);
+  const assetsSeries = useMemo(() => {
+    const sorted = [...(monthsOverviewRows || [])]
+      .filter((row) => Number.isFinite(Number(row.assetsCount)))
+      .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+    if (!sorted.length) return [0];
+    return sorted.map((row) => Number(row.assetsCount) || 0);
+  }, [monthsOverviewRows]);
+  const previousMonthKey = useMemo(() => {
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    return monthKey(prevYear, prevMonth);
+  }, [year, month]);
+  const previousMonthNetWorth = useMemo(() => {
+    const prev = (monthsOverviewRows || []).find((row) => row.month === previousMonthKey);
+    return Number(prev?.netWorth) || 0;
+  }, [monthsOverviewRows, previousMonthKey]);
+  const netWorthEvolution = useMemo(() => {
+    const diff = netWorth - previousMonthNetWorth;
+    if (!previousMonthNetWorth && !netWorth) {
+      return { pct: 0, diff };
+    }
+    if (!previousMonthNetWorth) {
+      return { pct: 100, diff };
+    }
+    return { pct: (diff / Math.abs(previousMonthNetWorth)) * 100, diff };
+  }, [netWorth, previousMonthNetWorth]);
 
   async function saveData(nextData) {
     setSavingLoading(true);
@@ -338,12 +408,58 @@ export default function Dashboard() {
       menu={APP_MENU}
       activeKey={page}
       onNavigate={setPage}
+      periodSelector={{
+        year,
+        month,
+        onChange: onChangeMonth,
+        disabled: savingLoading,
+      }}
     >
       <Stack gap={1.5}>
+        <Paper
+          sx={{
+            p: { xs: 1.8, md: 2.2 },
+            borderRadius: 5,
+            position: "relative",
+            overflow: "hidden",
+            background:
+              "linear-gradient(120deg, rgba(228, 233, 255, 0.95) 0%, rgba(239, 242, 255, 0.95) 48%, rgba(255, 233, 210, 0.92) 100%)",
+          }}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              right: -30,
+              top: -42,
+              width: 160,
+              height: 160,
+              borderRadius: "50%",
+              background:
+                "radial-gradient(circle, rgba(255, 186, 126, 0.42) 0%, rgba(255, 186, 126, 0) 70%)",
+            }}
+          />
+          <Stack direction={{ xs: "column", md: "row" }} gap={1.2} justifyContent="space-between">
+            <Stack direction="row" spacing={1.2} alignItems="center">
+              <Avatar sx={{ bgcolor: "primary.main", width: 42, height: 42 }}>
+                <WavingHandRoundedIcon fontSize="small" />
+              </Avatar>
+              <Box>
+                <Typography variant="subtitle1" sx={{ lineHeight: 1.1 }}>
+                  Ola! Vamos cuidar do seu mes financeiro
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Painel amigavel com foco em organizacao e consistencia.
+                </Typography>
+              </Box>
+            </Stack>
+            <Stack direction="row" gap={0.8} flexWrap="wrap" alignItems="center">
+              <Chip label={`Periodo ${selectedMonth}`} color="primary" size="small" />
+              <Chip label={`${assets.length} ativos`} color="secondary" size="small" />
+            </Stack>
+          </Stack>
+        </Paper>
+
         <MonthPicker
-          year={year}
-          month={month}
-          onChange={onChangeMonth}
           onCreateEmpty={handleCreateEmpty}
           onCopyFromPrevious={handleCopyFromPrevious}
           onDelete={handleDelete}
@@ -366,44 +482,62 @@ export default function Dashboard() {
           <Grow in timeout={300}>
             <Box sx={{ flex: "1 1 240px" }}>
               <MetricCard
-                label="Periodo"
-                title="Mes selecionado"
-                value={selectedMonth}
-                color="info.main"
-                icon={<CalendarMonthRoundedIcon fontSize="small" />}
+                title="Patrimonio do mes"
+                value={numberToCurrencyBR(netWorth)}
+                icon={<SavingsRoundedIcon fontSize="small" />}
+                accent="#1d4ed8"
+                titleColor="#0d2f90"
+                background="linear-gradient(90deg, #d6e7fb 0%, #c2d8f2 100%)"
+                trendText={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(1)}%`}
+                trendColor={netWorthEvolution.pct >= 0 ? "#1d4ed8" : "#b3261e"}
+                series={netWorthSeries}
               />
             </Box>
           </Grow>
           <Grow in timeout={360}>
             <Box sx={{ flex: "1 1 240px" }}>
               <MetricCard
-                label="Consolidado"
-                title="Patrimonio do mes"
-                value={numberToCurrencyBR(netWorth)}
-                color="success.main"
-                icon={<SavingsRoundedIcon fontSize="small" />}
+                title="Ativos cadastrados"
+                value={String(assets.length)}
+                icon={<AccountBalanceRoundedIcon fontSize="small" />}
+                accent="#6d28d9"
+                titleColor="#47138e"
+                background="linear-gradient(90deg, #ead9ff 0%, #d8c0f0 100%)"
+                trendText={`${assets.length} itens`}
+                trendColor="#4c1d95"
+                series={assetsSeries}
               />
             </Box>
           </Grow>
           <Grow in timeout={420}>
             <Box sx={{ flex: "1 1 240px" }}>
               <MetricCard
-                label="Composicao"
-                title="Ativos cadastrados"
-                value={String(assets.length)}
-                color="secondary.main"
-                icon={<AccountBalanceRoundedIcon fontSize="small" />}
+                title="Valor da fatura"
+                value={numberToCurrencyBR(invoiceTotal)}
+                icon={<ReceiptLongRoundedIcon fontSize="small" />}
+                accent="#b06b00"
+                titleColor="#8e4e00"
+                background="linear-gradient(90deg, #f8efcc 0%, #efdfad 100%)"
+                trendText={`${totalStatement >= 0 ? "+" : ""}${numberToCurrencyBR(totalStatement)}`}
+                trendColor="#8f4f00"
+                series={totalStatementSeries}
               />
             </Box>
           </Grow>
           <Grow in timeout={480}>
             <Box sx={{ flex: "1 1 240px" }}>
               <MetricCard
-                label="Movimentacao"
-                title="Saldo do extrato"
-                value={numberToCurrencyBR(totalStatement)}
-                color="primary.main"
-                icon={<TimelineRoundedIcon fontSize="small" />}
+                title="Evolucao patrimonial"
+                value={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(2)}%`}
+                icon={<InsightsRoundedIcon fontSize="small" />}
+                accent="#b3261e"
+                titleColor="#8c1712"
+                background="linear-gradient(90deg, #ffe5db 0%, #f3d2c6 100%)"
+                trendText={`${netWorthEvolution.diff >= 0 ? "+" : ""}${numberToCurrencyBR(
+                  netWorthEvolution.diff
+                )}`}
+                trendColor={netWorthEvolution.diff >= 0 ? "#9a3412" : "#b3261e"}
+                series={netWorthSeries}
               />
             </Box>
           </Grow>

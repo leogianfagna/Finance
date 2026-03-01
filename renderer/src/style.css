@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap");
+
 :root {
   color-scheme: light;
 }
@@ -15,7 +17,39 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 8% 0%, rgba(15, 118, 110, 0.13), transparent 32%),
-    radial-gradient(circle at 100% 10%, rgba(234, 88, 12, 0.1), transparent 35%),
-    #f4f7fb;
+    radial-gradient(circle at 7% 5%, rgba(255, 190, 118, 0.34), transparent 33%),
+    radial-gradient(circle at 95% 10%, rgba(117, 127, 240, 0.28), transparent 30%),
+    radial-gradient(circle at 50% 100%, rgba(174, 229, 255, 0.35), transparent 40%),
+    #edf0f8;
+  color: #1f2541;
+}
+
+#root {
+  position: relative;
+}
+
+#root::before,
+#root::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 999px;
+  filter: blur(1px);
+}
+
+#root::before {
+  width: 220px;
+  height: 220px;
+  top: 68px;
+  right: 8vw;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 183, 120, 0.56), rgba(255, 183, 120, 0));
+}
+
+#root::after {
+  width: 260px;
+  height: 260px;
+  left: -80px;
+  bottom: 8vh;
+  background: radial-gradient(circle at 40% 40%, rgba(88, 103, 232, 0.34), rgba(88, 103, 232, 0));
 }
