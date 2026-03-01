@@ -3,10 +3,12 @@ import {
   Alert,
   Avatar,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Grow,
   Paper,
+  Snackbar,
   Slide,
   Stack,
   TextField,
@@ -18,7 +20,6 @@ import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import WavingHandRoundedIcon from "@mui/icons-material/WavingHandRounded";
 import { financeApi } from "../api/financeApi.js";
-import MonthPicker from "../components/MonthPicker.jsx";
 import AssetEditor from "../components/AssetEditor.jsx";
 import AssetsTable from "../components/AssetsTable.jsx";
 import StatementImporter from "../components/StatmentImporter.jsx";
@@ -31,12 +32,39 @@ import { generateMonthSummary } from "../utils/data.js";
 import { ISODateToBR, numberToCurrencyBR } from "/src/utils/formatter.js";
 
 const APP_MENU = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "historico", label: "Historico" },
-  { key: "faturas", label: "Faturas" },
-  { key: "notas", label: "Notas" },
-  { key: "meses", label: "Meses" },
+  {
+    key: "geral",
+    label: "Geral",
+    items: [
+      { key: "meses", label: "Meses" },
+      { key: "configuracoes", label: "Configuracoes" },
+    ],
+  },
+  {
+    key: "registros",
+    label: "Registros",
+    items: [
+      { key: "dashboard", label: "Dashboard" },
+      { key: "historico", label: "Historico" },
+      { key: "faturas", label: "Faturas" },
+      { key: "notas", label: "Notas" },
+    ],
+  },
 ];
+const USER_SETTINGS_STORAGE_KEY = "friendly.user.settings";
+const DEFAULT_USER_SETTINGS = {
+  displayName: "",
+  email: "",
+  monthlyGoal: "",
+};
+
+function parseMonthKey(monthValue) {
+  const [yearRaw, monthRaw] = String(monthValue || "").split("-");
+  const parsedYear = Number(yearRaw);
+  const parsedMonth = Number(monthRaw);
+  if (!Number.isFinite(parsedYear) || !Number.isFinite(parsedMonth)) return null;
+  return { year: parsedYear, month: parsedMonth };
+}
 
 function BreakdownCard({ title, rows }) {
   return (
@@ -127,6 +155,76 @@ function InvoicesPanel({ rows }) {
   );
 }
 
+function UserSettingsPage() {
+  const [settings, setSettings] = useState(DEFAULT_USER_SETTINGS);
+  const [savedAt, setSavedAt] = useState("");
+
+  useEffect(() => {
+    const raw = localStorage.getItem(USER_SETTINGS_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      setSettings((current) => ({ ...current, ...(parsed || {}) }));
+    } catch {
+      setSettings(DEFAULT_USER_SETTINGS);
+    }
+  }, []);
+
+  function saveSettings() {
+    const payload = {
+      ...settings,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify(payload));
+    setSavedAt(ISODateToBR(payload.updatedAt));
+  }
+
+  return (
+    <Stack gap={1.5}>
+      <Paper sx={{ p: { xs: 2, md: 2.4 }, borderRadius: 4 }}>
+        <Stack gap={1.2}>
+          <Typography variant="h6">Configuracoes de usuario</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Personalize seus dados basicos para uso local neste dispositivo.
+          </Typography>
+          <TextField
+            label="Nome para exibicao"
+            value={settings.displayName}
+            onChange={(event) =>
+              setSettings((current) => ({ ...current, displayName: event.target.value }))
+            }
+          />
+          <TextField
+            label="Email"
+            type="email"
+            value={settings.email}
+            onChange={(event) => setSettings((current) => ({ ...current, email: event.target.value }))}
+          />
+          <TextField
+            label="Meta mensal"
+            value={settings.monthlyGoal}
+            onChange={(event) =>
+              setSettings((current) => ({ ...current, monthlyGoal: event.target.value }))
+            }
+            placeholder="Ex: Economizar R$ 1.000,00"
+          />
+          <Stack direction="row" justifyContent="flex-end">
+            <Button variant="contained" onClick={saveSettings}>
+              Salvar configuracoes
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+
+      {savedAt && (
+        <Alert severity="success" sx={{ borderRadius: 3 }}>
+          Configuracoes salvas. Ultima atualizacao: {savedAt}
+        </Alert>
+      )}
+    </Stack>
+  );
+}
+
 export default function Dashboard() {
   const now = getNowYearMonth();
   const [year, setYear] = useState(now.year);
@@ -138,7 +236,8 @@ export default function Dashboard() {
   const [monthsOverviewLoading, setMonthsOverviewLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingLoading, setSavingLoading] = useState(false);
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = useState("meses");
+  const [monthRequiredToastOpen, setMonthRequiredToastOpen] = useState(false);
 
   async function loadCurrentMonthData() {
     setLoading(true);
@@ -157,6 +256,7 @@ export default function Dashboard() {
       const list = await financeApi.monthsList();
       if (!Array.isArray(list) || list.length === 0) {
         setMonthsOverviewRows([]);
+        setMonthData(null);
         return;
       }
 
@@ -188,8 +288,18 @@ export default function Dashboard() {
           hasData: detail != null,
         };
       });
+      rows.sort((a, b) => String(b.month).localeCompare(String(a.month)));
 
       setMonthsOverviewRows(rows);
+      const selected = monthKey(year, month);
+      const currentExists = rows.some((row) => row.month === selected);
+      if (!currentExists && rows[0]?.month) {
+        const parsed = parseMonthKey(rows[0].month);
+        if (parsed) {
+          setYear(parsed.year);
+          setMonth(parsed.month);
+        }
+      }
     } finally {
       setMonthsOverviewLoading(false);
     }
@@ -277,34 +387,6 @@ export default function Dashboard() {
     }
   }
 
-  async function handleCreateEmpty() {
-    const empty = defaultMonthData(year, month);
-    await saveData(empty);
-  }
-
-  async function handleCopyFromPrevious() {
-    setSavingLoading(true);
-    try {
-      await financeApi.monthsCopyFromPrevious({ year, month });
-      await loadCurrentMonthData();
-      await loadMonthsOverview();
-    } finally {
-      setSavingLoading(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!confirm(`Excluir o mes ${selectedMonth}?`)) return;
-    setSavingLoading(true);
-    try {
-      await financeApi.monthsDelete({ year, month });
-      setMonthData(null);
-      await loadMonthsOverview();
-    } finally {
-      setSavingLoading(false);
-    }
-  }
-
   function handleAddAsset(asset) {
     const base = data ?? defaultMonthData(year, month);
     saveData({
@@ -356,11 +438,6 @@ export default function Dashboard() {
     saveData({ ...base, statement: nextData });
   }
 
-  function onChangeMonth({ year: y, month: m }) {
-    setYear(y);
-    setMonth(m);
-  }
-
   async function handleCreateMonthFromOverview({ year: targetYear, month: targetMonth, copyFrom }) {
     const exists = await financeApi.monthsGet({ year: targetYear, month: targetMonth });
     if (exists) {
@@ -398,8 +475,33 @@ export default function Dashboard() {
     await loadMonthsOverview();
   }
 
+  function handleOpenMonth(row) {
+    const parsed = parseMonthKey(row?.month);
+    if (!parsed) return;
+    setYear(parsed.year);
+    setMonth(parsed.month);
+    setPage("dashboard");
+  }
+
   const summaryByInstitution = Object.entries(summaryData?.totalByInstitution || {});
   const summaryByType = Object.entries(summaryData?.totalByType || {});
+  const hasSelectedMonth = useMemo(
+    () => monthsOverviewRows.some((row) => row.month === selectedMonth),
+    [monthsOverviewRows, selectedMonth]
+  );
+  const monthRequiredPages = useMemo(
+    () => new Set(["dashboard", "historico", "faturas", "notas"]),
+    []
+  );
+
+  function canNavigateToPage(nextPage) {
+    if (!monthRequiredPages.has(nextPage)) return true;
+    return hasSelectedMonth;
+  }
+
+  function handleBlockedNavigation() {
+    setMonthRequiredToastOpen(true);
+  }
 
   return (
     <AppShell
@@ -408,217 +510,224 @@ export default function Dashboard() {
       menu={APP_MENU}
       activeKey={page}
       onNavigate={setPage}
-      periodSelector={{
-        year,
-        month,
-        onChange: onChangeMonth,
-        disabled: savingLoading,
-      }}
+      canNavigate={canNavigateToPage}
+      onBlockedNavigate={handleBlockedNavigation}
     >
-      <Stack gap={1.5}>
-        <Paper
-          sx={{
-            p: { xs: 1.8, md: 2.2 },
-            borderRadius: 5,
-            position: "relative",
-            overflow: "hidden",
-            background:
-              "linear-gradient(120deg, rgba(228, 233, 255, 0.95) 0%, rgba(239, 242, 255, 0.95) 48%, rgba(255, 233, 210, 0.92) 100%)",
-          }}
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              right: -30,
-              top: -42,
-              width: 160,
-              height: 160,
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle, rgba(255, 186, 126, 0.42) 0%, rgba(255, 186, 126, 0) 70%)",
-            }}
-          />
-          <Stack direction={{ xs: "column", md: "row" }} gap={1.2} justifyContent="space-between">
-            <Stack direction="row" spacing={1.2} alignItems="center">
-              <Avatar sx={{ bgcolor: "primary.main", width: 42, height: 42 }}>
-                <WavingHandRoundedIcon fontSize="small" />
-              </Avatar>
-              <Box>
-                <Typography variant="subtitle1" sx={{ lineHeight: 1.1 }}>
-                  Ola! Vamos cuidar do seu mes financeiro
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Painel amigavel com foco em organizacao e consistencia.
-                </Typography>
-              </Box>
-            </Stack>
-            <Stack direction="row" gap={0.8} flexWrap="wrap" alignItems="center">
-              <Chip label={`Periodo ${selectedMonth}`} color="primary" size="small" />
-              <Chip label={`${assets.length} ativos`} color="secondary" size="small" />
-            </Stack>
-          </Stack>
-        </Paper>
-
-        <MonthPicker
-          onCreateEmpty={handleCreateEmpty}
-          onCopyFromPrevious={handleCopyFromPrevious}
-          onDelete={handleDelete}
-          disabled={savingLoading}
-        />
-
-        {savingLoading && (
-          <Alert severity="info" icon={<CircularProgress size={16} />}>
-            Salvando alteracoes...
-          </Alert>
-        )}
-
-        {!loading && !monthData && (
-          <Alert severity="warning">
-            Esse mes ainda nao foi criado.
-          </Alert>
-        )}
-
-        <Stack direction={{ xs: "column", md: "row" }} gap={1.3} flexWrap="wrap">
-          <Grow in timeout={300}>
-            <Box sx={{ flex: "1 1 240px" }}>
-              <MetricCard
-                title="Patrimonio do mes"
-                value={numberToCurrencyBR(netWorth)}
-                icon={<SavingsRoundedIcon fontSize="small" />}
-                accent="#1d4ed8"
-                titleColor="#0d2f90"
-                background="linear-gradient(90deg, #d6e7fb 0%, #c2d8f2 100%)"
-                trendText={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(1)}%`}
-                trendColor={netWorthEvolution.pct >= 0 ? "#1d4ed8" : "#b3261e"}
-                series={netWorthSeries}
-              />
-            </Box>
-          </Grow>
-          <Grow in timeout={360}>
-            <Box sx={{ flex: "1 1 240px" }}>
-              <MetricCard
-                title="Ativos cadastrados"
-                value={String(assets.length)}
-                icon={<AccountBalanceRoundedIcon fontSize="small" />}
-                accent="#6d28d9"
-                titleColor="#47138e"
-                background="linear-gradient(90deg, #ead9ff 0%, #d8c0f0 100%)"
-                trendText={`${assets.length} itens`}
-                trendColor="#4c1d95"
-                series={assetsSeries}
-              />
-            </Box>
-          </Grow>
-          <Grow in timeout={420}>
-            <Box sx={{ flex: "1 1 240px" }}>
-              <MetricCard
-                title="Valor da fatura"
-                value={numberToCurrencyBR(invoiceTotal)}
-                icon={<ReceiptLongRoundedIcon fontSize="small" />}
-                accent="#b06b00"
-                titleColor="#8e4e00"
-                background="linear-gradient(90deg, #f8efcc 0%, #efdfad 100%)"
-                trendText={`${totalStatement >= 0 ? "+" : ""}${numberToCurrencyBR(totalStatement)}`}
-                trendColor="#8f4f00"
-                series={totalStatementSeries}
-              />
-            </Box>
-          </Grow>
-          <Grow in timeout={480}>
-            <Box sx={{ flex: "1 1 240px" }}>
-              <MetricCard
-                title="Evolucao patrimonial"
-                value={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(2)}%`}
-                icon={<InsightsRoundedIcon fontSize="small" />}
-                accent="#b3261e"
-                titleColor="#8c1712"
-                background="linear-gradient(90deg, #ffe5db 0%, #f3d2c6 100%)"
-                trendText={`${netWorthEvolution.diff >= 0 ? "+" : ""}${numberToCurrencyBR(
-                  netWorthEvolution.diff
-                )}`}
-                trendColor={netWorthEvolution.diff >= 0 ? "#9a3412" : "#b3261e"}
-                series={netWorthSeries}
-              />
-            </Box>
-          </Grow>
-        </Stack>
-
-        <Slide direction="up" in timeout={320} mountOnEnter unmountOnExit key={page}>
-          <Box>
-            {page === "dashboard" && (
-              <Stack gap={1.4}>
-                <AssetEditor onAdd={handleAddAsset} />
-                <AssetsTable
-                  assets={assets}
-                  onUpdateAsset={handleUpdateAsset}
-                  onRemoveAsset={handleRemoveAsset}
-                />
-                <Stack direction={{ xs: "column", md: "row" }} gap={1.3}>
-                  <Box sx={{ flex: 1 }}>
-                    <BreakdownCard title="Total por instituicao" rows={summaryByInstitution} />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <BreakdownCard title="Total por tipo de ativo" rows={summaryByType} />
-                  </Box>
-                </Stack>
-              </Stack>
-            )}
-
-            {page === "historico" && (
-              <Stack gap={1.4}>
-                <StatementImporter onImport={handleSaveStatementRows} />
-                <StatementTable
-                  rows={statement}
-                  onAddRow={handleAddStatementRow}
-                  onUpdateRow={handleUpdateStatementRow}
-                  onRemoveRow={handleRemoveStatementRow}
-                />
-              </Stack>
-            )}
-
-            {page === "faturas" && <InvoicesPanel rows={statement} />}
-
-            {page === "notas" && (
-              <Paper sx={{ p: 2, borderRadius: 3 }}>
-                <Typography variant="subtitle1" mb={1.2}>
-                  Notas do mes
-                </Typography>
-                <TextField
-                  multiline
-                  minRows={5}
-                  fullWidth
-                  value={data?.meta?.notes || ""}
-                  onChange={(e) => {
-                    const base = data ?? defaultMonthData(year, month);
-                    const next = {
-                      ...base,
-                      meta: { ...(base.meta || {}), notes: e.target.value },
-                    };
-                    saveData(next);
+      {page === "configuracoes" ? (
+        <UserSettingsPage />
+      ) : (
+        <Stack gap={1.5}>
+          {page !== "meses" && (
+            <>
+              <Paper
+                sx={{
+                  p: { xs: 1.8, md: 2.2 },
+                  borderRadius: 5,
+                  position: "relative",
+                  overflow: "hidden",
+                  background:
+                    "linear-gradient(120deg, rgba(228, 233, 255, 0.95) 0%, rgba(239, 242, 255, 0.95) 48%, rgba(255, 233, 210, 0.92) 100%)",
+                }}
+              >
+                <Box
+                  sx={{
+                    position: "absolute",
+                    right: -30,
+                    top: -42,
+                    width: 160,
+                    height: 160,
+                    borderRadius: "50%",
+                    background:
+                      "radial-gradient(circle, rgba(255, 186, 126, 0.42) 0%, rgba(255, 186, 126, 0) 70%)",
                   }}
-                  placeholder="Ex: mudancas na carteira, observacoes..."
                 />
+                <Stack direction={{ xs: "column", md: "row" }} gap={1.2} justifyContent="space-between">
+                  <Stack direction="row" spacing={1.2} alignItems="center">
+                    <Avatar sx={{ bgcolor: "primary.main", width: 42, height: 42 }}>
+                      <WavingHandRoundedIcon fontSize="small" />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ lineHeight: 1.1 }}>
+                        Ola! Vamos cuidar do seu mes financeiro
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Painel amigavel com foco em organizacao e consistencia.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Stack direction="row" gap={0.8} flexWrap="wrap" alignItems="center">
+                    <Chip label={`Periodo ${selectedMonth}`} color="primary" size="small" />
+                    <Chip label={`${assets.length} ativos`} color="secondary" size="small" />
+                  </Stack>
+                </Stack>
               </Paper>
-            )}
 
-            {page === "meses" && (
-              <MonthsOverview
-                rows={monthsOverviewRows}
-                loading={monthsOverviewLoading}
-                onCreateMonth={handleCreateMonthFromOverview}
-              />
-            )}
-          </Box>
-        </Slide>
+              {savingLoading && (
+                <Alert severity="info" icon={<CircularProgress size={16} />}>
+                  Salvando alteracoes...
+                </Alert>
+              )}
 
-        {(loading || monthData) && (
-          <Typography color="text.secondary" fontSize={13}>
-            {loading
-              ? "Atualizando dados do mes..."
-              : `Ultima modificacao: ${ISODateToBR(monthData?.updated_at)}`}
-          </Typography>
-        )}
-      </Stack>
+              <Stack direction={{ xs: "column", md: "row" }} gap={1.3} flexWrap="wrap">
+                <Grow in timeout={300}>
+                  <Box sx={{ flex: "1 1 240px" }}>
+                    <MetricCard
+                      title="Patrimonio do mes"
+                      value={numberToCurrencyBR(netWorth)}
+                      icon={<SavingsRoundedIcon fontSize="small" />}
+                      accent="#1d4ed8"
+                      titleColor="#0d2f90"
+                      background="linear-gradient(90deg, #d6e7fb 0%, #c2d8f2 100%)"
+                      trendText={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(1)}%`}
+                      trendColor={netWorthEvolution.pct >= 0 ? "#1d4ed8" : "#b3261e"}
+                      series={netWorthSeries}
+                    />
+                  </Box>
+                </Grow>
+                <Grow in timeout={360}>
+                  <Box sx={{ flex: "1 1 240px" }}>
+                    <MetricCard
+                      title="Ativos cadastrados"
+                      value={String(assets.length)}
+                      icon={<AccountBalanceRoundedIcon fontSize="small" />}
+                      accent="#6d28d9"
+                      titleColor="#47138e"
+                      background="linear-gradient(90deg, #ead9ff 0%, #d8c0f0 100%)"
+                      trendText={`${assets.length} itens`}
+                      trendColor="#4c1d95"
+                      series={assetsSeries}
+                    />
+                  </Box>
+                </Grow>
+                <Grow in timeout={420}>
+                  <Box sx={{ flex: "1 1 240px" }}>
+                    <MetricCard
+                      title="Valor da fatura"
+                      value={numberToCurrencyBR(invoiceTotal)}
+                      icon={<ReceiptLongRoundedIcon fontSize="small" />}
+                      accent="#b06b00"
+                      titleColor="#8e4e00"
+                      background="linear-gradient(90deg, #f8efcc 0%, #efdfad 100%)"
+                      trendText={`${totalStatement >= 0 ? "+" : ""}${numberToCurrencyBR(totalStatement)}`}
+                      trendColor="#8f4f00"
+                      series={totalStatementSeries}
+                    />
+                  </Box>
+                </Grow>
+                <Grow in timeout={480}>
+                  <Box sx={{ flex: "1 1 240px" }}>
+                    <MetricCard
+                      title="Evolucao patrimonial"
+                      value={`${netWorthEvolution.pct >= 0 ? "+" : ""}${netWorthEvolution.pct.toFixed(2)}%`}
+                      icon={<InsightsRoundedIcon fontSize="small" />}
+                      accent="#b3261e"
+                      titleColor="#8c1712"
+                      background="linear-gradient(90deg, #ffe5db 0%, #f3d2c6 100%)"
+                      trendText={`${netWorthEvolution.diff >= 0 ? "+" : ""}${numberToCurrencyBR(
+                        netWorthEvolution.diff
+                      )}`}
+                      trendColor={netWorthEvolution.diff >= 0 ? "#9a3412" : "#b3261e"}
+                      series={netWorthSeries}
+                    />
+                  </Box>
+                </Grow>
+              </Stack>
+            </>
+          )}
+
+          <Slide direction="up" in timeout={320} mountOnEnter unmountOnExit key={page}>
+            <Box>
+              {page === "dashboard" && (
+                <Stack gap={1.4}>
+                  <AssetEditor onAdd={handleAddAsset} />
+                  <AssetsTable
+                    assets={assets}
+                    onUpdateAsset={handleUpdateAsset}
+                    onRemoveAsset={handleRemoveAsset}
+                  />
+                  <Stack direction={{ xs: "column", md: "row" }} gap={1.3}>
+                    <Box sx={{ flex: 1 }}>
+                      <BreakdownCard title="Total por instituicao" rows={summaryByInstitution} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <BreakdownCard title="Total por tipo de ativo" rows={summaryByType} />
+                    </Box>
+                  </Stack>
+                </Stack>
+              )}
+
+              {page === "historico" && (
+                <Stack gap={1.4}>
+                  <StatementImporter onImport={handleSaveStatementRows} />
+                  <StatementTable
+                    rows={statement}
+                    onAddRow={handleAddStatementRow}
+                    onUpdateRow={handleUpdateStatementRow}
+                    onRemoveRow={handleRemoveStatementRow}
+                  />
+                </Stack>
+              )}
+
+              {page === "faturas" && <InvoicesPanel rows={statement} />}
+
+              {page === "notas" && (
+                <Paper sx={{ p: 2, borderRadius: 3 }}>
+                  <Typography variant="subtitle1" mb={1.2}>
+                    Notas do mes
+                  </Typography>
+                  <TextField
+                    multiline
+                    minRows={5}
+                    fullWidth
+                    value={data?.meta?.notes || ""}
+                    onChange={(e) => {
+                      const base = data ?? defaultMonthData(year, month);
+                      const next = {
+                        ...base,
+                        meta: { ...(base.meta || {}), notes: e.target.value },
+                      };
+                      saveData(next);
+                    }}
+                    placeholder="Ex: mudancas na carteira, observacoes..."
+                  />
+                </Paper>
+              )}
+
+              {page === "meses" && (
+                <MonthsOverview
+                  rows={monthsOverviewRows}
+                  loading={monthsOverviewLoading}
+                  onCreateMonth={handleCreateMonthFromOverview}
+                  onSelectMonth={handleOpenMonth}
+                />
+              )}
+            </Box>
+          </Slide>
+
+          {page !== "meses" && (loading || monthData) && (
+            <Typography color="text.secondary" fontSize={13}>
+              {loading
+                ? "Atualizando dados do mes..."
+                : `Ultima modificacao: ${ISODateToBR(monthData?.updated_at)}`}
+            </Typography>
+          )}
+        </Stack>
+      )}
+      <Snackbar
+        open={monthRequiredToastOpen}
+        autoHideDuration={2800}
+        onClose={() => setMonthRequiredToastOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setMonthRequiredToastOpen(false)}
+          severity="warning"
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          Nao ha nenhum mes selecionado.
+        </Alert>
+      </Snackbar>
     </AppShell>
   );
 }

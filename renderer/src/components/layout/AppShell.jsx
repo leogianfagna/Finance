@@ -4,15 +4,13 @@ import {
   Box,
   Chip,
   Drawer,
-  FormControl,
   IconButton,
-  InputLabel,
+  Divider,
   List,
+  ListSubheader,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  MenuItem,
-  Select,
   Stack,
   Toolbar,
   Typography,
@@ -26,15 +24,17 @@ import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import CalendarViewMonthRoundedIcon from "@mui/icons-material/CalendarViewMonthRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 
 const drawerWidth = 260;
 
 const menuIcons = {
-  dashboard: <SpaceDashboardRoundedIcon />,
   historico: <HistoryRoundedIcon />,
   faturas: <ReceiptLongRoundedIcon />,
   notas: <EditNoteRoundedIcon />,
   meses: <CalendarViewMonthRoundedIcon />,
+  configuracoes: <SettingsRoundedIcon />,
+  dashboard: <SpaceDashboardRoundedIcon />,
 };
 
 export default function AppShell({
@@ -43,22 +43,28 @@ export default function AppShell({
   menu,
   activeKey,
   onNavigate,
+  canNavigate,
+  onBlockedNavigate,
   children,
-  periodSelector,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
-  const currentYear = new Date().getFullYear();
-  const years = useMemo(
-    () => Array.from({ length: 8 }, (_, idx) => currentYear - 5 + idx),
-    [currentYear]
+
+  const groupedMenu = useMemo(() => {
+    if (!Array.isArray(menu) || !menu.length) return [];
+    if (menu[0]?.items) return menu;
+    return [{ key: "default", label: "Paginas", items: menu }];
+  }, [menu]);
+
+  const flatMenu = useMemo(
+    () => groupedMenu.flatMap((group) => group.items || []),
+    [groupedMenu]
   );
-  const months = useMemo(() => Array.from({ length: 12 }, (_, idx) => idx + 1), []);
 
   const current = useMemo(
-    () => menu.find((item) => item.key === activeKey) || menu[0],
-    [menu, activeKey]
+    () => flatMenu.find((item) => item.key === activeKey) || flatMenu[0],
+    [flatMenu, activeKey]
   );
 
   const content = (
@@ -78,91 +84,72 @@ export default function AppShell({
         <Typography variant="subtitle2" color="text.secondary" sx={{ letterSpacing: "0.06em" }}>
           FRIENDLY
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Selecione o periodo
+        <Typography variant="h6" sx={{ lineHeight: 1.1 }}>
+          {title}
         </Typography>
-        {periodSelector ? (
-          <Stack direction="row" gap={0.8}>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Ano</InputLabel>
-              <Select
-                value={periodSelector.year}
-                label="Ano"
-                disabled={periodSelector.disabled}
-                onChange={(event) =>
-                  periodSelector.onChange({
-                    year: Number(event.target.value),
-                    month: periodSelector.month,
-                  })
-                }
-              >
-                {years.map((yearOption) => (
-                  <MenuItem key={yearOption} value={yearOption}>
-                    {yearOption}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Mes</InputLabel>
-              <Select
-                value={periodSelector.month}
-                label="Mes"
-                disabled={periodSelector.disabled}
-                onChange={(event) =>
-                  periodSelector.onChange({
-                    year: periodSelector.year,
-                    month: Number(event.target.value),
-                  })
-                }
-              >
-                {months.map((monthOption) => (
-                  <MenuItem key={monthOption} value={monthOption}>
-                    {String(monthOption).padStart(2, "0")}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-        ) : (
-          <Typography variant="h6" sx={{ lineHeight: 1.1 }}>
-            {title}
-          </Typography>
-        )}
       </Stack>
 
-      <List sx={{ p: 0, zIndex: 1 }}>
-        {menu.map((item) => (
-          <ListItemButton
-            key={item.key}
-            selected={activeKey === item.key}
-            onClick={() => {
-              onNavigate(item.key);
-              setMobileOpen(false);
-            }}
-            sx={{
-              borderRadius: 3,
-              mb: 0.8,
-              border: "1px solid transparent",
-              transition: "all 180ms ease",
-              "&:hover": {
-                borderColor: "divider",
-                bgcolor: "rgba(255, 255, 255, 0.75)",
-              },
-              "&.Mui-selected": {
-                bgcolor: "rgba(87, 103, 232, 0.12)",
-                color: "primary.main",
-                borderColor: "rgba(87, 103, 232, 0.26)",
-              },
-            }}
+      <Stack sx={{ p: 0, zIndex: 1 }} gap={1}>
+        {groupedMenu.map((group, groupIndex) => (
+          <List
+            key={group.key || group.label || groupIndex}
+            sx={{ p: 0 }}
+            subheader={
+              <ListSubheader
+                disableGutters
+                sx={{
+                  px: 1.2,
+                  pb: 0.5,
+                  bgcolor: "transparent",
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  color: "text.secondary",
+                  lineHeight: 1.2,
+                }}
+              >
+                {group.label}
+              </ListSubheader>
+            }
           >
-            <ListItemIcon sx={{ minWidth: 38, color: "inherit" }}>
-              {menuIcons[item.key]}
-            </ListItemIcon>
-            <ListItemText primary={item.label} />
-          </ListItemButton>
+            {group.items?.map((item) => (
+              <ListItemButton
+                key={item.key}
+                selected={activeKey === item.key}
+                onClick={() => {
+                  if (canNavigate && !canNavigate(item.key)) {
+                    onBlockedNavigate?.(item.key);
+                    return;
+                  }
+                  onNavigate(item.key);
+                  setMobileOpen(false);
+                }}
+                sx={{
+                  borderRadius: 3,
+                  mb: 0.8,
+                  border: "1px solid transparent",
+                  transition: "all 180ms ease",
+                  "&:hover": {
+                    borderColor: "divider",
+                    bgcolor: "rgba(255, 255, 255, 0.75)",
+                  },
+                  "&.Mui-selected": {
+                    bgcolor: "rgba(87, 103, 232, 0.12)",
+                    color: "primary.main",
+                    borderColor: "rgba(87, 103, 232, 0.26)",
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 38, color: "inherit" }}>
+                  {menuIcons[item.key]}
+                </ListItemIcon>
+                <ListItemText primary={item.label} />
+              </ListItemButton>
+            ))}
+            {groupIndex < groupedMenu.length - 1 && <Divider sx={{ mt: 0.6, mb: 0.2 }} />}
+          </List>
         ))}
-      </List>
+      </Stack>
     </Stack>
   );
 

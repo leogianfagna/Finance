@@ -17,7 +17,7 @@ import FinanceDataGrid from "./common/FinanceDataGrid.jsx";
 import { numberToCurrencyBR } from "/src/utils/formatter.js";
 import { monthKey } from "/src/utils/month.js";
 
-export default function MonthsOverview({ rows, loading, onCreateMonth }) {
+export default function MonthsOverview({ rows, loading, onCreateMonth, onSelectMonth }) {
   const now = new Date();
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(now.getFullYear());
@@ -128,7 +128,15 @@ export default function MonthsOverview({ rows, loading, onCreateMonth }) {
         <Alert severity="info">Nenhum mes encontrado no banco de dados.</Alert>
       )}
 
-      <FinanceDataGrid loading={loading} rows={rows || []} columns={columns} />
+      <FinanceDataGrid
+        loading={loading}
+        rows={rows || []}
+        columns={columns}
+        onRowClick={(params) => onSelectMonth?.(params.row)}
+        sx={{
+          "& .MuiDataGrid-row": { cursor: "pointer" },
+        }}
+      />
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Criar novo mes</DialogTitle>
