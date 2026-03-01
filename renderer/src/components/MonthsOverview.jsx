@@ -45,6 +45,11 @@ export default function MonthsOverview({ rows, loading, onCreateMonth, onSelectM
         minWidth: 100,
       },
       {
+        field: "servicesPositiveCount",
+        headerName: "Servicos",
+        minWidth: 110,
+      },
+      {
         field: "statementCount",
         headerName: "Lancamentos",
         minWidth: 130,

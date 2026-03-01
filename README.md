@@ -1,3 +1,6 @@
+# Rodar dev
+npm run dev na raíz
+
 # Instalação e build
 
 Clone este repositório e instale as dependências:
@@ -16,6 +19,8 @@ Esse comando:
 1. gera o build do React (`renderer/dist`);
 2. chama o `electron-builder` usando `electron/electron-builder.yml`;
 3. escreve os artefatos de instalação em `dist/`. Terá um .exe pronto para rodar o aplicativo
+
+
 ## Dados ausentes para analytics financeiros avancados
 
 Hoje a aplicacao ja permite bons graficos com os dados atuais (patrimonio mensal, composicao por tipo/instituicao, fluxo de entradas e saidas e despesas por categoria).

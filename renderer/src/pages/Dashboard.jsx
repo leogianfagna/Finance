@@ -28,6 +28,7 @@ import MonthsOverview from "../components/MonthsOverview.jsx";
 import AppShell from "../components/layout/AppShell.jsx";
 import MetricCard from "../components/common/MetricCard.jsx";
 import AnalyticsDashboard from "../components/dashboard/AnalyticsDashboard.jsx";
+import ServicesPanel from "../components/services/ServicesPanel.jsx";
 import { computeTotals, defaultMonthData, getNowYearMonth, monthKey } from "../utils/month.js";
 import { generateMonthSummary } from "../utils/data.js";
 import { ISODateToBR, numberToCurrencyBR } from "/src/utils/formatter.js";
@@ -47,6 +48,7 @@ const APP_MENU = [
     items: [
       { key: "dashboard", label: "Dashboard" },
       { key: "patrimonio", label: "Patrimonio" },
+      { key: "servicos", label: "Servicos" },
       { key: "historico", label: "Historico" },
       { key: "faturas", label: "Faturas" },
       { key: "notas", label: "Notas" },
@@ -271,6 +273,7 @@ export default function Dashboard() {
         const detailsData = detail?.data || defaultMonthData(item.year, item.month);
         const assets = detailsData.assets || [];
         const statementRows = detailsData.statement || [];
+        const servicesRows = detailsData.services || [];
         const netWorth =
           Number(detailsData?.totals?.netWorth) ||
           assets.reduce((sum, asset) => sum + (Number(asset.total) || 0), 0);
@@ -278,12 +281,16 @@ export default function Dashboard() {
           (sum, statement) => sum + (Number(statement.amount) || 0),
           0
         );
+        const servicesPositiveCount = servicesRows.filter(
+          (service) => Number(service.amount) > 0
+        ).length;
 
         return {
           id: item.id || `${item.year}-${item.month}`,
           month: monthKey(item.year, item.month),
           netWorth,
           assetsCount: assets.length,
+          servicesPositiveCount,
           statementCount: statementRows.length,
           statementTotal,
           updatedAt: ISODateToBR(detail?.updated_at || item.updated_at),
@@ -319,6 +326,7 @@ export default function Dashboard() {
 
   const assets = useMemo(() => (data?.assets ? data.assets : []), [data]);
   const statement = useMemo(() => (data?.statement ? data.statement : []), [data]);
+  const services = useMemo(() => (data?.services ? data.services : []), [data]);
 
   const netWorth = useMemo(() => {
     return assets.reduce((sum, a) => sum + (Number(a.total) || 0), 0);
@@ -440,6 +448,30 @@ export default function Dashboard() {
     saveData({ ...base, statement: nextData });
   }
 
+  function handleAddServiceRow(newService) {
+    const base = data ?? defaultMonthData(year, month);
+    saveData({
+      ...base,
+      services: [...(base.services || []), newService],
+    });
+  }
+
+  function handleUpdateServiceRow(serviceId, patch) {
+    const base = data ?? defaultMonthData(year, month);
+    const nextServices = (base.services || []).map((service) =>
+      service.id === serviceId
+        ? { ...service, ...patch, lastUpdate: new Date().toISOString().slice(0, 10) }
+        : service
+    );
+    saveData({ ...base, services: nextServices });
+  }
+
+  function handleRemoveServiceRow(serviceId) {
+    const base = data ?? defaultMonthData(year, month);
+    const nextServices = (base.services || []).filter((service) => service.id !== serviceId);
+    saveData({ ...base, services: nextServices });
+  }
+
   async function handleCreateMonthFromOverview({ year: targetYear, month: targetMonth, copyFrom }) {
     const exists = await financeApi.monthsGet({ year: targetYear, month: targetMonth });
     if (exists) {
@@ -492,7 +524,7 @@ export default function Dashboard() {
     [monthsOverviewRows, selectedMonth]
   );
   const monthRequiredPages = useMemo(
-    () => new Set(["dashboard", "patrimonio", "historico", "faturas", "notas"]),
+    () => new Set(["dashboard", "patrimonio", "servicos", "historico", "faturas", "notas"]),
     []
   );
 
@@ -679,6 +711,16 @@ export default function Dashboard() {
                     onRemoveRow={handleRemoveStatementRow}
                   />
                 </Stack>
+              )}
+
+              {page === "servicos" && (
+                <ServicesPanel
+                  rows={services}
+                  selectedMonth={selectedMonth}
+                  onAddRow={handleAddServiceRow}
+                  onUpdateRow={handleUpdateServiceRow}
+                  onRemoveRow={handleRemoveServiceRow}
+                />
               )}
 
               {page === "faturas" && <InvoicesPanel rows={statement} />}

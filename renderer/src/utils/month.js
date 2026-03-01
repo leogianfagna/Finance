@@ -16,6 +16,7 @@ export function defaultMonthData(year, month) {
     month: monthKey(year, month),
     assets: [],
     statement: [],
+    services: [],
     totals: { netWorth: 0 },
     meta: { copiedFrom: null, notes: "" },
   };
